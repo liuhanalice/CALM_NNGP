@@ -28,12 +28,6 @@ def _make_optimizer(model, lr):
     params = [p for p in model.parameters() if p.requires_grad]
     return torch.optim.Adam(params, lr=lr)
 
-def make_eval_fn(dataloader, device):
-    def _eval(model):
-        res = test(model, dataloader, device=device, report_recon=False)
-        return res["accuracy"]  # 0..1
-    return _eval
-
 # ---------- Build feature dict BEFORE training the new task ----------
 @torch.no_grad()
 def build_feature_dict(model, dataloader, device=None, max_items=None, dtype=torch.float32):
@@ -109,6 +103,7 @@ def train( model,
         model.train()
         total_loss = total_ce = total_rec = total_feat = total_logit = 0.0
         correct = total = 0
+        test_acc = None
 
         for data, label in trloader:
             data, label = data.to(device), label.to(device)
@@ -171,10 +166,10 @@ def train( model,
             correct += (preds == label).sum().item()
             total   += label.size(0)
 
-            # eval per epoch
-            if eval_fn is not None:
-                test_acc = float(eval_fn(model))  # expects 0..1
-                history.setdefault("test_acc_per_epoch", []).append(100.0 * test_acc)
+        # eval per epoch
+        if eval_fn is not None:
+            test_acc = float(eval_fn(model))  # expects 0..1
+            history.setdefault("test_acc", []).append(100.0 * test_acc)
 
         n_batches = max(len(trloader), 1)
         epoch_loss = total_loss / n_batches
@@ -191,10 +186,13 @@ def train( model,
         history["logit_reg"].append(epoch_logit)
         history["acc"].append(epoch_acc)
 
-        print(
+        msg = (
             f"Epoch {ep+1}/{epochs} | loss {epoch_loss:.4f} | ce {epoch_ce:.4f} "
-            f"| rec {epoch_rec:.4f} | feat {epoch_feat:.4f} | logit {epoch_logit:.4f} | acc {epoch_acc:.2f}%"
+            f"| rec {epoch_rec:.4f} | feat {epoch_feat:.4f} | logit {epoch_logit:.4f} "
+            f"| train_acc {epoch_acc:.2f}%"
         )
+        msg += f" | test_acc {test_acc*100:.2f}%" if test_acc is not None else " | test_acc N/A"
+        print(msg)
 
     return history
 

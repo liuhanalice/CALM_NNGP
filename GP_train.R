@@ -12,26 +12,24 @@ source("utils.R")
 
 set.seed(430)
 option_list <- list(
-  make_option(c("--n_tr"), type = "numeric", default = 1500,
+  make_option(c("--n_tr"), type = "numeric", default = 1000,
               help = "Number of training data *per existing class* [default: %default]"),
-  make_option(c("--n_ts"), type = "numeric", default = 1000,
+  make_option(c("--n_ts"), type = "numeric", default = 1500,
               help = "Number of testing data *per existing class* [default: %default]"),
   make_option(c("--n_octr"), type = "numeric", default = 50,
               help = "Number of training data from other classes (in total) 
               to include in training target GP model  [default: %default]"),
   make_option(c("--val_fac"), type = "numeric", default = 0.8,
               help = "The train/validation factor [default: %default]"),
-  make_option(c("-f", "--feature_size"), type = "numeric", default = 64,
+  make_option(c("-f", "--feature_size"), type = "numeric", default = 16,
               help = "Number of features (X dimension) [default: %default]"),
   make_option(c("-p", "--save_path"), type = "character", default = NULL,
               help = "The directory to save files"),
-  make_option(c("--directory"), type = "character", default = "500New_Data_withGP_f64/task0-5",
-              help = "The directory to save files"),
   make_option(c("--data_tr"), type = "character",
-              default = "500New_Data_withGP_f64/task0-4/out/f64_task0-4/filtered_train_sftmx.csv",
+              default = NULL,
               help = "The path to training dataset"),
   make_option(c("--data_ts"), type = "character",
-              default = "500New_Data_withGP_f64/task0-4/out/f64_task0-4/test_sftmx.csv",
+              default = NULL,
               help = "The path to testing dataset"),
   make_option(c("--n_indcpts"), type = "numeric", default = 1000,
               help = "Number of inducing points [default: %default]"),
@@ -54,8 +52,7 @@ GP_package <- args$GP_package
 
 # Create save path
 if (is.null(args$save_path)){
-  dir <- paste0(args$directory,"/RData/")
-  args$save_path <- paste0(dir,"indpts_Rdata_ntr", 
+  args$save_path <- paste0(args$save_path,"/indpts_Rdata_ntr", 
                            toString(args$n_tr), "_nts",
                            toString(args$n_ts), "_noctr",
                            toString(args$n_octr), "_f",
@@ -119,6 +116,8 @@ if (is_test) {
     sampled_other_val <- load_classes_other_than_label(val.df, label, existingclass_set, other_class_sample_num)
     
     current_data <- load_data_per_class(train.df, label, args$n_tr)
+    print("DEBUG-current_data dim:")
+    print(dim(current_data))
     current_data_val <- load_data_per_class(val.df, label, args$n_tr)
 
     all_data_X[[key]] <- current_data[, 1:f]

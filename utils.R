@@ -49,6 +49,10 @@ split_train_val <- function(df, label_col, val_fac = 0.8) {
 
 # Load data for class = label with size = n
 load_data_per_class <- function(df, label, n){
+  print("DEBUG-label-n:")
+  print(label)
+  print(n)
+
    if (! is.data.frame(df)) {
     stop("Input must be a data frame")
   }

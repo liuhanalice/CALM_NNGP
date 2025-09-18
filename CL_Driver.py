@@ -7,6 +7,8 @@ import math
 import random
 import argparse
 from datetime import datetime
+import re
+import matplotlib.pyplot as plt
 
 
 import numpy as np
@@ -24,7 +26,8 @@ from NN_AE_utils import (
     test,                             # eval CE (and optional recon report)
     build_feature_dict,               # caches {image_bytes -> f_size feature}
     freeze_classifier_head,           # freezes fc2+fc3
-    unfreeze_classifier_head
+    unfreeze_classifier_head,
+    make_eval_fn
 )
 
 # =============== Utilities ===============
@@ -89,6 +92,7 @@ def extract_features_and_logits(model, dataloader, device):
         labs.append(y.clone())
     return torch.cat(feats), torch.cat(logs), torch.cat(labs)
 
+
 def save_gp_csv(out_dir, task_id, Z, LOG, Y):
     """
     Saves a CSV with columns: f_0..f_{f_size-1}, logit_0..logit_9, label
@@ -114,16 +118,18 @@ def save_gp_csv(out_dir, task_id, Z, LOG, Y):
     print(f"[Task {task_id}] Saved GP CSV -> {path} "
           f"(features {tuple(Z_np.shape)}, logits {tuple(LOG_np.shape)})")
 
+
 def save_checkpoint(out_dir, task_id, model):
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"model_task{task_id}.pt")
     torch.save(model.state_dict(), path)
     print(f"[Task {task_id}] Checkpoint saved -> {path}")
 
+
 def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, fname)
-    headers = ["timestamp","task_id","task_digits","epoch_or_final","train_loss","train_ce","train_rec","train_feat_reg",
+    headers = ["timestamp","task_id","task_digits","epoch_or_final","train_loss","train_ce","train_rec","train_feat_reg", "train_logit_reg", 
                "test_loss","test_acc","test_rec_loss","seen_tasks_mean_acc"] + \
               [f"acc_task{i}" for i in range(len(tasks))]
     if not os.path.exists(path):
@@ -131,10 +137,12 @@ def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
             csv.writer(f).writerow(headers)
     return path, headers
 
+
 def log_metrics_row(csv_path, headers, row_dict):
     row = [row_dict.get(h, "") for h in headers]
     with open(csv_path, "a", newline="") as f:
         csv.writer(f).writerow(row)
+
 
 @torch.no_grad()
 def evaluate_across_seen_tasks(model, seen_test_loaders, device):
@@ -154,8 +162,64 @@ def evaluate_across_seen_tasks(model, seen_test_loaders, device):
         accs.append(correct / max(total, 1))
     return accs
 
+
 def pretty_task(tasks, t):
     return "[" + ",".join(map(str, tasks[t])) + "]"
+
+def plot_acc_over_all_tasks(
+    histories_per_task,
+    epochs_per_task,
+    per_epoch_test_acc_available=False,
+    test_end_accs=None,
+    title="Training & Testing Accuracy over Global Epochs",
+    save_path=None
+):
+    """
+    histories_per_task: list of history dicts returned by train(), one per task.
+                        Must include history["acc"] (per-epoch train acc, 0..100).
+                        If per_epoch_test_acc_available, also include history["test_acc_per_epoch"] (0..100).
+    epochs_per_task: list of ints, the epoch count used for each task (len == num_tasks).
+    per_epoch_test_acc_available: bool, True if you enabled eval_fn during training.
+    test_end_accs: list of floats 0..1 for end-of-task test accuracy (len == num_tasks).
+    """
+
+    # Build global x-axis offsets
+    offsets = [0]
+    for e in epochs_per_task[:-1]:
+        offsets.append(offsets[-1] + e)
+
+    plt.figure()
+    global_last_epoch = 0
+
+    for t, hist in enumerate(histories_per_task):
+        start = offsets[t]
+        T = len(hist.get("acc", []))
+        x = [start + i + 1 for i in range(T)]  # epoch indices start at 1 per task
+
+        # Training accuracy (solid)
+        plt.plot(x, hist["acc"], label=f"Task {t} train")
+
+        # Testing accuracy
+        if per_epoch_test_acc_available and "test_acc_per_epoch" in hist:
+            print("test per epoch")
+            plt.plot(x, hist["test_acc_per_epoch"], linestyle="--", label=f"Task {t} test")
+        else:
+            # end-of-task marker if provided
+            if test_end_accs is not None and t < len(test_end_accs):
+                end_x = start + T
+                plt.scatter([end_x], [100.0 * test_end_accs[t]], marker="o", label=f"Task {t} test (final)")
+
+        global_last_epoch = max(global_last_epoch, start + T)
+
+    plt.xlabel("Global Epoch Index")
+    plt.ylabel("Accuracy (%)")
+    plt.title(title)
+    plt.xlim(0, global_last_epoch + 1)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=150)
+    plt.show()
 
 # =============== Main Driver ===============
 
@@ -187,7 +251,7 @@ def main():
 
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
     tasks = [[0,1,2,3,4],[5],[6],[7],[8],[9]]
-    tasks = [[0,1,2,3,4,5,6,7,8], [9]]
+    # tasks = [[0,1,2,3,4,5,6,7,8], [9]]
 
     # Output dirs
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -217,7 +281,15 @@ def main():
 
     # For feature-preservation, cache features after each task
     old_feature_dict = None
+    old_logit_dict = None
     seen_test_loaders = []
+
+    # Per Epoch Evaluation
+    eval_fn = make_eval_fn(test_loaders[t], device) if args.log_every_epoch else None
+    histories_per_task = []
+    epochs_per_task = []
+    test_end_accs = []
+
 
     # ------------- Loop over tasks -------------
     for t, tr_loader in enumerate(train_loaders):
@@ -226,14 +298,16 @@ def main():
         print("="*80)
 
         # Freeze head for tasks after 0
+        # freeze_flag = False
+        # if t == 0:
+        #     freeze_flag = False
+        #     print("Task 0: head is UNFROZEN (learning initial classifier).")
+        # else:
+        #     freeze_flag = True
+        #     print("Task >0: FREEZING classifier head (fc2+fc3).")
+
+        # NOTE: Do not freeze 
         freeze_flag = False
-        if t == 0:
-            freeze_flag = False
-            print("Task 0: head is UNFROZEN (learning initial classifier).")
-        else:
-            freeze_flag = True
-            print("Task >0: FREEZING classifier head (fc2+fc3).")
-            
 
         # Train
         epochs = args.epochs0 if t == 0 else args.epochs
@@ -247,9 +321,11 @@ def main():
             lambda_rec=args.lambda_rec,
             lambda_feat=(0.0 if t == 0 else args.lambda_feat),
             old_feature_dict=(None if t == 0 else old_feature_dict),
+            old_logit_dict=(None if t == 0 else old_logit_dict),
             freeze_head=freeze_flag,
             device=device,
-            grad_clip=None
+            grad_clip=None,
+            eval_fn=eval_fn
         )
 
         dur = time.time() - start_time
@@ -263,6 +339,10 @@ def main():
         res = test(model, test_loaders[t], device=device, report_recon=True)
         print(f"[Task {t}] Test -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
               f"rec_loss: {res.get('rec_loss', float('nan')):.4f}")
+        
+        histories_per_task.append(history)
+        epochs_per_task.append(epochs)
+        test_end_accs.append(res["accuracy"])
 
         # Evaluate across all seen tasks
         seen_test_loaders.append(test_loaders[t])
@@ -304,6 +384,8 @@ def main():
                     "train_ce": history["ce"][ep_idx],
                     "train_rec": history["rec"][ep_idx] if "rec" in history else "",
                     "train_feat_reg": history["feat_reg"][ep_idx] if "feat_reg" in history else "",
+                    "train_logit_reg": history["logit_reg"][ep_idx] if "logit_reg" in history else "",
+                    "train_acc": history["acc"][ep_idx],    
                     # test metrics per-epoch not computed to keep it fast
                     "test_ce_loss": "",
                     "test_acc": "",
@@ -320,7 +402,7 @@ def main():
         print(f"[Task {t}] Caching f_size features for feature-preservation in next task...")
         cache_loader = DataLoader(Subset(train_ds, filter_indices_by_labels(train_ds, sum(tasks[:t+1], []))),
                                   batch_size=args.test_bs, shuffle=False, num_workers=2, pin_memory=True)
-        old_feature_dict = build_feature_dict(
+        old_feature_dict, old_logit_dict = build_feature_dict(
             model=model,
             dataloader=cache_loader,
             device=device,
@@ -336,6 +418,14 @@ def main():
     if not args.no_checkpoint:
         print(f"Checkpoints:   {ck_dir}")
 
+    plot_acc_over_all_tasks(
+        histories_per_task=histories_per_task,
+        epochs_per_task=epochs_per_task,
+        per_epoch_test_acc_available=("test_acc_per_epoch" in histories_per_task[0]),
+        test_end_accs=test_end_accs,
+        title="MNIST Continual: Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_over_time.png")
+    )
 
 if __name__ == "__main__":
     main()

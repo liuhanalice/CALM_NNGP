@@ -49,9 +49,6 @@ split_train_val <- function(df, label_col, val_fac = 0.8) {
 
 # Load data for class = label with size = n
 load_data_per_class <- function(df, label, n){
-  print("DEBUG-label-n:")
-  print(label)
-  print(n)
 
    if (! is.data.frame(df)) {
     stop("Input must be a data frame")
@@ -60,7 +57,7 @@ load_data_per_class <- function(df, label, n){
   label_df <- as.matrix(df[df[, "label"] == label, ])
   
   if (n > nrow(label_df)) {
-    print(paste0("n is greater than the number of rows in the data frame, using all rows:", nrow(label_df)))
+    # print(paste0("n is greater than the number of rows in the data frame, using all rows:", nrow(label_df)))
     n <- nrow(label_df)
   }
   select_index <- sample(nrow(label_df), n, replace = FALSE)
@@ -72,7 +69,7 @@ load_data_per_class <- function(df, label, n){
 load_classes_other_than_label <- function(df, label, existingclass_set, n){
   other_class <- as.matrix(df[df[, "label"] %in% setdiff(existingclass_set, label), ])
   if (n > nrow(other_class)) {
-    print(paste0("n is greater than the number of rows in the data frame, using all rows:", nrow(other_class)))
+    # print(paste0("n is greater than the number of rows in the data frame, using all rows:", nrow(other_class)))
     n <- nrow(other_class)
   }
   sampled_other <- random_select_rows(other_class, n)
@@ -286,32 +283,31 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   if (nrow(X) != nrow(Y)) {
     stop("Number of rows in X and Y must be equal")
   }
-  
+
   # laGP, not using inducing points, but sample some points to save as "inducing/sampling reference points"
   gp_model <- newGPsep(X=X, Z=Y, d = rep(10, ncol(X)), g = 1e-6, dK = TRUE)
   mleGPsep(gp_model, param = "both") # tmin and tmax by default, see laGP reference
-  
+
   out <- predGPsep(gp_model, X)
   out.val <- predGPsep(gp_model, val.X)
 
   num_total_points <- nrow(X)
-  
-  if (use_inducing){
-    if(num_inducing > nrow(X_t)){
+
+  if (use_inducing) {
+    if (num_inducing > nrow(X_t)){
       num_inducing <- nrow(X_t)
-      print(paste0("Selecting ", num_inducing, " inducing points"))
     }
     # use manually selected inducing points(randomly selected)
     set.seed(42)
     # num_inducing only for target class (X_t)
     Z_t <- X_t[sample(1:nrow(X_t), num_inducing), , drop = FALSE]
 
-     inducing_points <- Z_t
+    inducing_points <- Z_t
   }
   else { # return all training points
     inducing_points <- X_t
   }
-
+  print(paste0("Selecting ", nrow(inducing_points), " inducing points"))
   mse <- norm(out.val$mean - val.Y, "2")
   print(paste0("validation MSE for class", label, ": ", mse))
 

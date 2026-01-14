@@ -26,10 +26,10 @@ option_list <- list(
   make_option(c("-p", "--save_path"), type = "character", default = NULL,
               help = "The directory to save files"),
   make_option(c("--data_tr"), type = "character",
-              default = NULL,
+              default = "runs_mnist_continual/run_20250918_213623/task0/train_feat.csv",
               help = "The path to training dataset"),
   make_option(c("--data_ts"), type = "character",
-              default = NULL,
+              default = "runs_mnist_continual/run_20250918_213623/task0/test_feat.csv",
               help = "The path to testing dataset"),
   make_option(c("--n_indcpts"), type = "numeric", default = 1000,
               help = "Number of inducing points [default: %default]"),
@@ -116,9 +116,8 @@ if (is_test) {
     sampled_other_val <- load_classes_other_than_label(val.df, label, existingclass_set, other_class_sample_num)
     
     current_data <- load_data_per_class(train.df, label, args$n_tr)
-    print("DEBUG-current_data dim:")
-    print(dim(current_data))
     current_data_val <- load_data_per_class(val.df, label, args$n_tr)
+
 
     all_data_X[[key]] <- current_data[, 1:f]
     all_data_Y[[key]] <- current_data[, (f + j), drop = FALSE]
@@ -131,9 +130,9 @@ if (is_test) {
     val.X <- rbind(val_data_X[[key]], sampled_other_val[, 1:f])
     val.Y <- rbind(val_data_Y[[key]], sampled_other_val[, (f + j), drop = FALSE])
 
-    print(paste0("class ", label, " training sample size (indclude n_octr other classes): ", nrow(X)))
-    # print(paste0("DEBUG: j=", j, "," , dim(all_data_X[[key]]), ", ", dim(sampled_other[, 1:f]), ", ", dim(all_data_Y[[key]]), ", ", dim(sampled_other[, (f + j), drop = FALSE]), ", ", dim(val.X), ", ", dim(val.Y)))
-
+    print(paste0("class ", label, " training sample size (indclude ", nrow(sampled_other)," samples from other classes): ", nrow(X)))
+    print(paste0("class ", label, " validation set sample size (indclude ", nrow(sampled_other_val)," samples from other classes): ", nrow(val.X)))
+  
     ### train_GP: bind target class and other classes ###
     # GPj <- train_GP(X=X, Y=Y, val.X=val.X, val.Y=val.Y, label=label, use_inducing = TRUE, num_inducing = num_inducing)
     if (GP_package == 'gplite') {

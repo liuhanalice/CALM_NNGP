@@ -9,7 +9,11 @@ import argparse
 from datetime import datetime
 import re
 import matplotlib.pyplot as plt
-import os, subprocess, shlex
+import shlex
+import shutil
+import subprocess
+from pathlib import Path
+import platform
 
 import numpy as np
 import pandas as pd
@@ -19,15 +23,13 @@ from torch.utils.data import DataLoader, Subset, TensorDataset, ConcatDataset, D
 from torchvision import datasets, transforms
 
 
-# ---- Adapt these imports to your filenames/modules ----
-# Assumes your model returns (logits, recon, f) where f is f_size features
+
 from NN_AE import CALM_AE_NN
 from NN_AE_utils import (
     train,  # CE + λ_rec*MSE(recon,x) + λ_feat*MSE(f,f_prev)
     test,                             # eval CE (and optional recon report)
     build_feature_dict,               # caches {image_bytes -> f_size feature}
-    freeze_classifier_head,           # freezes fc2+fc3
-    unfreeze_classifier_head
+    train_2_stage
 )
 
 # =============== Costomized Dataset Class: Matching with MNIST format ===============
@@ -99,12 +101,14 @@ def _save_df(arr2d, path, col_names):
     df.to_csv(path, index=False)  # no index column
 
 @torch.no_grad()
-def _collect_feats_logits_labels(model, loader, device):
+def _collect_feats_logits_labels(model, loader, device, apply_softmax=True):
     model.eval()
     feats, logits, labels = [], [], []
     for x, y in loader:
         x = x.to(device)
-        z, _, f = model(x)              # (logits, recon, features)
+        z, _, f = model(x) # (logits, recon, features)
+        if apply_softmax:
+            z = torch.softmax(z, dim=1)               
         feats.append(f.detach().cpu())
         logits.append(z.detach().cpu())
         labels.append(y.detach().cpu())
@@ -114,7 +118,7 @@ def _collect_feats_logits_labels(model, loader, device):
     return feats, logits, labels
 
 @torch.no_grad()
-def export_task_csvs(model, train_loader, test_loader, device, out_dir, f_size, num_classes=10):
+def export_task_csvs(model, train_loader, list_test_loader, device, out_dir, f_size, num_classes=10):
     """
     Writes:
       - features: <out_dir>/train_feat.csv, <out_dir>/test_feat.csv   (f_size cols + 1 label)
@@ -122,16 +126,27 @@ def export_task_csvs(model, train_loader, test_loader, device, out_dir, f_size, 
     """
     os.makedirs(out_dir, exist_ok=True)
 
+    
+    # Train feature CSV
     tr_f, tr_z, tr_y = _collect_feats_logits_labels(model, train_loader, device)
-    ts_f, ts_z, ts_y = _collect_feats_logits_labels(model, test_loader, device)
-
     # column names
     feat_cols = [f"f{i}" for i in range(tr_f.shape[1])] + [f"z{i}" for i in range(tr_z.shape[1])] + ["label"]
-
-    # Save feature CSVs
     train_feat_csv = os.path.join(out_dir, "train_feat.csv")
-    test_feat_csv  = os.path.join(out_dir, "test_feat.csv")
     _save_df(np.concatenate([tr_f, tr_z, tr_y], axis=1), train_feat_csv, feat_cols)
+    
+    # Test CSV
+    ts_feats, ts_logits, ts_labels = [], [], []
+    for loader in list_test_loader:
+        f, z, y = _collect_feats_logits_labels(model, loader, device)
+        ts_feats.append(f)
+        ts_logits.append(z)
+        ts_labels.append(y)
+
+    ts_f = np.concatenate(ts_feats, axis=0)
+    ts_z = np.concatenate(ts_logits, axis=0)
+    ts_y = np.concatenate(ts_labels, axis=0)
+
+    test_feat_csv = os.path.join(out_dir, "test_feat.csv")
     _save_df(np.concatenate([ts_f, ts_z, ts_y], axis=1), test_feat_csv, feat_cols)
 
     return {
@@ -196,9 +211,23 @@ def save_checkpoint(out_dir, task_id, model):
 def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, fname)
-    headers = ["timestamp","task_id","task_digits","epoch_or_final","train_loss","train_ce","train_rec","train_feat_reg", "train_logit_reg", 
-               "test_loss","test_acc","test_rec_loss","seen_tasks_mean_acc"] + \
-              [f"acc_task{i}" for i in range(len(tasks))]
+    headers = [
+        "timestamp",
+        "task_id",
+        "task_digits",
+        "epoch_or_final",
+        "stage",              # NEW: tag "AE" or "Head"
+        "train_loss",
+        "train_ce",
+        "train_rec",
+        "train_feat_reg",
+        "train_logit_reg",
+        "test_ce_loss",       # FIX: match your logging key
+        "test_acc",
+        "test_rec_loss",
+        "seen_tasks_mean_acc",
+    ] + [f"acc_task{i}" for i in range(len(tasks))]
+
     if not os.path.exists(path):
         with open(path, "w", newline="") as f:
             csv.writer(f).writerow(headers)
@@ -244,21 +273,67 @@ def evaluate_across_seen_tasks(model, seen_test_loaders, device):
 def pretty_task(tasks, t):
     return "[" + ",".join(map(str, tasks[t])) + "]"
 
-def run_rscript_and_wait(rscript_path, r_args_str=None, cwd=None):
+def run_rscript_and_wait(rscript_path, r_args_str=None, cwd=None, r_cmd=None):
     """
-    Runs: Rscript <rscript_path> [r_args...]
-    r_args_str is split with shlex.split so you can pass 'key=val key2=val2'
-    Raises on nonzero exit or if file outputs are missing (you check existence after call).
+    Runs: <Rscript command> <rscript_path> [r_args...]
+
+    - On Windows:
+        * If r_cmd is provided, it will be used (recommended).
+        * Otherwise we try to find Rscript on PATH; if not found, we raise with a helpful message.
+    - On macOS/Linux:
+        * Uses 'Rscript' by default, unless r_cmd is provided.
+
+    r_args_str is split with shlex.split so you can pass 'key=val key2=val2'.
+    Raises on nonzero exit. Returns stdout (string).
     """
-    cmd = ["Rscript", rscript_path]
-    if r_args_str:
-        cmd += shlex.split(r_args_str)
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    # Normalize rscript_path and cwd
+    rscript_path = str(rscript_path)
+    if cwd is not None:
+        cwd = str(Path(cwd))
+        if not os.path.isdir(cwd):
+            raise FileNotFoundError(f"cwd does not exist: {cwd}")
+
+    system = platform.system()
+
+    # Decide which Rscript command to use
+    if r_cmd:
+        r_exec = str(r_cmd)
+        if not os.path.exists(r_exec):
+            raise FileNotFoundError(f"r_cmd does not exist: {r_exec}")
+    else:
+        if system == "Windows":
+            # Try PATH first
+            r_exec = shutil.which("Rscript")
+            if not r_exec:
+                # Not found — ask user to supply r_cmd explicitly
+                raise FileNotFoundError(
+                    "Rscript not found on PATH. On Windows, pass r_cmd with the full path to Rscript.exe, "
+                    "e.g., r_cmd=r'C:\\Program Files\\R\\R-4.3.1\\bin\\Rscript.exe'."
+                )
+        else:
+            # macOS/Linux default
+            r_exec = shutil.which("Rscript") or "Rscript"
+
+    # Build command
+    cmd = [r_exec, rscript_path]
+    if isinstance(r_args_str, str):
+        cmd += shlex.split(r_args_str, posix=(os.name != "nt"))
+    elif isinstance(r_args_str, (list, tuple)):
+        cmd += list(map(str, r_args_str))
+
+    # Run
+    proc = subprocess.run(cmd, cwd=cwd, stdout=None, stderr=None, check=True)
+
     if proc.returncode != 0:
         raise RuntimeError(
-            f"Rscript failed with code {proc.returncode}\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+            f"Rscript failed with code {proc.returncode}\n"
+            f"CMD: {cmd}\n"
+            f"STDOUT:\n{proc.stdout}\n"
+            f"STDERR:\n{proc.stderr}"
         )
+
     return proc.stdout
+
 
 def load_features_labels_from_Rcsv(csv_path, f_size, dtype=torch.float32, device="cpu"):
     """
@@ -355,6 +430,27 @@ def plot_acc_over_all_tasks(
         plt.savefig(save_path, bbox_inches="tight", dpi=150)
     plt.show()
 
+
+def extract_head_only_history(history_2stage):
+    """
+    Convert a train_2_stage history (with 'stage' and 'train_acc') into a
+    single-stage history dict compatible with plot_acc_over_all_tasks,
+    keeping ONLY the 'Head' epochs.
+    """
+    mask = [s == "Head" for s in history_2stage.get("stage", [])]
+
+    head_hist = {
+        "acc":        [a for a, m in zip(history_2stage.get("train_acc", []), mask) if m],
+        "test_acc":   [t for t, m in zip(history_2stage.get("test_acc", []), mask) if m],
+        "loss":       [l for l, m in zip(history_2stage.get("loss", []), mask) if m],
+        "ce":         [c for c, m in zip(history_2stage.get("ce", []), mask) if m],
+        "logit_reg":  [r for r, m in zip(history_2stage.get("logit_reg", []), mask) if m],
+        # optional: keep stage/epoch if you want to annotate
+        "epoch":      [e for e, m in zip(history_2stage.get("epoch", []), mask) if m],
+    }
+    return head_hist
+
+
 # =============== Main Driver ===============
 
 def main():
@@ -367,10 +463,13 @@ def main():
     parser.add_argument("--epochs0",   type=int, default=30,  help="epochs for task 0")
     parser.add_argument("--epochs",    type=int, default=30,  help="epochs for tasks 1..")
     parser.add_argument("--lr",        type=float, default=1e-3)
+    parser.add_argument("--lr_AE",     type=float, default=1e-4)
+    parser.add_argument("--lr_head",   type=float, default=1e-3)
     parser.add_argument("--train_bs",  type=int, default=128)
     parser.add_argument("--test_bs",   type=int, default=128)
     parser.add_argument("--lambda_rec",  type=float, default=0.5, help="weight for reconstruction loss")
     parser.add_argument("--lambda_feat", type=float, default=1.0, help="weight for feature preservation")
+    parser.add_argument("--lambda_logit", type=float, default=1.0, help="weight for logit preservation")
     parser.add_argument("--seed",      type=int, default=42)
     parser.add_argument("--no_checkpoint", action="store_true")
     parser.add_argument("--rscript_path", type=str, default="GP_train.R",
@@ -379,8 +478,8 @@ def main():
                         help="limit cached feature dict size (None = all)")
     parser.add_argument("--log_every_epoch", action="store_true",
                         help="also dump a CSV row each epoch (not just end-of-task)")
-    parser.add_argument("--GP_train_size_per_class", type=int, default=1000)
-    parser.add_argument("--GP_test_size_per_class", type=int, default=1500)
+    parser.add_argument("--GP_train_size_per_class", type=int, default=2000)
+    parser.add_argument("--GP_test_size_per_class", type=int, default=1000)
     parser.add_argument("--GP_train_otc_size", type=int, default=50)
     parser.add_argument("--GP_num_indcpts", type=int, default=1000)
     parser.add_argument("--GP_package", type=str, default="gplite")
@@ -394,6 +493,7 @@ def main():
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
     tasks = [[0,1,2,3,4],[5],[6],[7],[8],[9]]
     last_digits = [4,5,6,7,8,9]
+    train_size = [15000,3000,3000,3000,3000,3000]
     # tasks = [[0,1,2,3,4,5,6,7,8], [9]]
 
     # Output dirs
@@ -415,7 +515,7 @@ def main():
 
     train_loaders, test_loaders = [], []
     for t, labels in enumerate(tasks):
-        tr, ts, _, _ = make_task_loaders(train_ds, test_ds, labels, args.train_bs, args.test_bs, seed=args.seed)
+        tr, ts, _, _ = make_task_loaders(train_ds, test_ds, labels, args.train_bs, args.test_bs, train_size=train_size[t], seed=args.seed)
         train_loaders.append(tr)
         test_loaders.append(ts)
 
@@ -458,19 +558,42 @@ def main():
         seen_test_loaders.append(test_loaders[t])
         eval_fn = (lambda m: eval_seen_mean(m, seen_test_loaders, device)) if args.log_every_epoch else None
         
-        history = train(
+        # history = train(
+        #     model=model,
+        #     trloader=tr_loader,
+        #     epochs=epochs,
+        #     lr=args.lr,
+        #     lambda_rec=args.lambda_rec,
+        #     lambda_feat=(0.0 if t == 0 else args.lambda_feat),
+        #     lambda_logit=(0.0 if t == 0 else args.lambda_logit)
+        #     old_feature_dict=(None if t == 0 else old_feature_dict),
+        #     old_logit_dict=(None if t == 0 else old_logit_dict),
+        #     freeze_head=freeze_flag,
+        #     device=device,
+        #     grad_clip=None,
+        #     eval_fn=eval_fn
+        # )
+
+        history = train_2_stage(
             model=model,
             trloader=tr_loader,
-            epochs=epochs,
-            lr=args.lr,
-            lambda_rec=args.lambda_rec,
-            lambda_feat=(0.0 if t == 0 else args.lambda_feat),
-            old_feature_dict=(None if t == 0 else old_feature_dict),
-            old_logit_dict=(None if t == 0 else old_logit_dict),
-            freeze_head=freeze_flag,
+            # --- Stage 1 (AE) ---
+            epochs_stage1=epochs,
+            lr_stage1=args.lr_AE,
+            lambda_rec_stage1=args.lambda_rec,     # recon loss weight
+            lambda_feat_stage1=(0.0 if t == 0 else args.lambda_feat),    # feature preservation weight (MSE(f_curr, f_prev))
+            old_feature_dict=(None if t == 0 else old_feature_dict),     # {image_bytes: f_prev_tensor}
+            # --- Stage 2 (Head) ---
+            epochs_stage2=epochs,
+            lr_stage2=args.lr_head,
+            lambda_ce_stage2=1.0,      # CE weight
+            lambda_logit_stage2=(0.0 if t == 0 else args.lambda_logit),   # logit preservation weight (MSE(z_curr, z_prev[mask]))
+            old_logit_dict=(None if t == 0 else old_logit_dict),       # {image_bytes: z_prev_tensor} (prev logits)
+            logit_mask=None,           # torch.BoolTensor[num_classes] or None
+            # --- common ---
             device=device,
             grad_clip=None,
-            eval_fn=eval_fn
+            eval_fn=eval_fn               # callable(model)->acc in [0,1]
         )
 
         dur = time.time() - start_time
@@ -482,19 +605,24 @@ def main():
 
         # Evaluate on current task test set
         res = test(model, test_loaders[t], device=device, report_recon=True)
-        print(f"[Task {t}] Test -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
+        print(f"[Task {t}] Test (new data) -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
               f"rec_loss: {res.get('rec_loss', float('nan')):.4f}")
         
         histories_per_task.append(history)
         epochs_per_task.append(epochs)
+        # For 2 stage train:
+        head_histories_per_task = [extract_head_only_history(h) for h in histories_per_task]
+        epochs_head_per_task = [len(h["acc"]) for h in head_histories_per_task]
         test_end_accs.append(res["accuracy"])
+
+
 
         # Prepare for GP
         task_dir = os.path.join(run_dir, f"task{t}")
         csv_paths = export_task_csvs(
             model=model,
             train_loader=tr_loader,
-            test_loader=test_loaders[t],
+            list_test_loader=seen_test_loaders,
             device=device,
             out_dir=task_dir,
             f_size=args.f_size,
@@ -513,11 +641,29 @@ def main():
         print(f"Mean over seen tasks (0..{t}): {100*mean_seen:.2f}%")
 
         # CSV logging: end-of-task row
+        # row_end = {
+        #     "timestamp": datetime.now().isoformat(timespec="seconds"),
+        #     "task_id": t,
+        #     "task_digits": str(tasks[t]),
+        #     "epoch_or_final": f"final_e{epochs}",
+        #     "train_loss": history["loss"][-1] if "loss" in history else "",
+        #     "train_ce": history["ce"][-1] if "ce" in history else "",
+        #     "train_rec": history["rec"][-1] if "rec" in history else "",
+        #     "train_feat_reg": history["feat_reg"][-1] if "feat_reg" in history else "",
+        #     "test_ce_loss": res["ce_loss"],
+        #     "test_acc": res["accuracy"],
+        #     "test_rec_loss": res.get("rec_loss", ""),
+        #     "seen_tasks_mean_acc": mean_seen
+        # }
+        # for i in range(len(tasks)):
+        #     row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
+        # log_metrics_row(csv_path, headers, row_end)
         row_end = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "task_id": t,
             "task_digits": str(tasks[t]),
             "epoch_or_final": f"final_e{epochs}",
+            "stage": "Head",   # or "AE" if you also log AE finals
             "train_loss": history["loss"][-1] if "loss" in history else "",
             "train_ce": history["ce"][-1] if "ce" in history else "",
             "train_rec": history["rec"][-1] if "rec" in history else "",
@@ -532,20 +678,41 @@ def main():
         log_metrics_row(csv_path, headers, row_end)
 
         # Optional per-epoch logging rows
+        # if args.log_every_epoch:
+        #     for ep_idx in range(len(history["loss"])):
+        #         row_ep = {
+        #             "timestamp": datetime.now().isoformat(timespec="seconds"),
+        #             "task_id": t,
+        #             "task_digits": str(tasks[t]),
+        #             "epoch_or_final": f"epoch_{ep_idx+1}",
+        #             "train_loss": history["loss"][ep_idx],
+        #             "train_ce": history["ce"][ep_idx],
+        #             "train_rec": history["rec"][ep_idx] if "rec" in history else "",
+        #             "train_feat_reg": history["feat_reg"][ep_idx] if "feat_reg" in history else "",
+        #             "train_logit_reg": history["logit_reg"][ep_idx] if "logit_reg" in history else "",
+        #             "train_acc": history["acc"][ep_idx],    
+        #             # test metrics per-epoch not computed to keep it fast
+        #             "test_ce_loss": "",
+        #             "test_acc": "",
+        #             "test_rec_loss": "",
+        #             "seen_tasks_mean_acc": ""
+        #         }
+        #         log_metrics_row(csv_path, headers, row_ep)
         if args.log_every_epoch:
             for ep_idx in range(len(history["loss"])):
+                stage_tag = history["stage"][ep_idx] if "stage" in history else ""
                 row_ep = {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
                     "task_id": t,
                     "task_digits": str(tasks[t]),
-                    "epoch_or_final": f"epoch_{ep_idx+1}",
+                    "epoch_or_final": f"epoch_{ep_idx+1}_{stage_tag}",
+                    "stage": stage_tag,  # NEW
                     "train_loss": history["loss"][ep_idx],
-                    "train_ce": history["ce"][ep_idx],
-                    "train_rec": history["rec"][ep_idx] if "rec" in history else "",
-                    "train_feat_reg": history["feat_reg"][ep_idx] if "feat_reg" in history else "",
-                    "train_logit_reg": history["logit_reg"][ep_idx] if "logit_reg" in history else "",
-                    "train_acc": history["acc"][ep_idx],    
-                    # test metrics per-epoch not computed to keep it fast
+                    "train_ce": history["ce"][ep_idx] if stage_tag == "Head" else "",
+                    "train_rec": history["rec"][ep_idx] if stage_tag == "AE" else "",
+                    "train_feat_reg": history["feat_reg"][ep_idx] if stage_tag == "AE" else "",
+                    "train_logit_reg": history["logit_reg"][ep_idx] if stage_tag == "Head" else "",
+                    "train_acc": history["train_acc"][ep_idx],
                     "test_ce_loss": "",
                     "test_acc": "",
                     "test_rec_loss": "",
@@ -559,18 +726,27 @@ def main():
 
         # Run Rscript and reconstruct R inducing points as "buffer" for next task
         print(f"[Task {t}] Running Rscript to produce: {task_dir}/inducing_points.csv")
-        r_args = (
-            f'--n_tr "{args.GP_train_size_per_class}" '
-            f'--n_ts "{args.GP_test_size_per_class}" '
-            f'--n_otcr "{args.GP_train_otc_size}" '
-            f'--n_indcpts "{args.GP_num_indcpts}" '
-            f'--GP_package "{args.GP_package}" '
-            f'--save_path "{task_dir}" '
-            f'--data_tr "{data_tr_path}" '
-            f'--data_ts "{data_ts_path}" '
-            f'--last_class "{last_digits[t]}"'
-        )   
-        run_rscript_and_wait(args.rscript_path, r_args_str=r_args, cwd=None)
+        r_args = [
+            "--n_tr", str(args.GP_train_size_per_class),
+            "--n_ts", str(args.GP_test_size_per_class),
+            "--n_octr", str(args.GP_train_otc_size),
+            "--n_indcpts", str(args.GP_num_indcpts),
+            "--GP_package", args.GP_package,
+            "--save_path", str(task_dir),
+            "--data_tr", str(data_tr_path),
+            "--data_ts", str(data_ts_path),
+            "--last_class", str(last_digits[t]),
+        ]
+        
+        if platform.system() == "Windows":
+            run_rscript_and_wait(
+                rscript_path=Path.cwd() / args.rscript_path,
+                r_args_str=r_args,
+                cwd=Path.cwd(),
+                r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",  # <-- Windows override
+            )
+        else:
+            run_rscript_and_wait(args.rscript_path, r_args_str=r_args, cwd=None)
 
         R_inducing_path = os.path.join(task_dir, "inducing_points.csv")
         if not os.path.exists(R_inducing_path):
@@ -625,14 +801,25 @@ def main():
     if not args.no_checkpoint:
         print(f"Checkpoints:   {ck_dir}")
 
+    # plot_acc_over_all_tasks(
+    #     histories_per_task=histories_per_task,
+    #     epochs_per_task=epochs_per_task,
+    #     per_epoch_test_acc_available=("test_acc" in histories_per_task[0]),
+    #     test_end_accs=test_end_accs,
+    #     title="MNIST Continual: Accuracy vs Global Epochs",
+    #     save_path=os.path.join(run_dir, "acc_over_time.png")
+    # )
+
+    # FIXME: below is for 2-stage train 
     plot_acc_over_all_tasks(
-        histories_per_task=histories_per_task,
-        epochs_per_task=epochs_per_task,
-        per_epoch_test_acc_available=("test_acc" in histories_per_task[0]),
-        test_end_accs=test_end_accs,
-        title="MNIST Continual: Accuracy vs Global Epochs",
-        save_path=os.path.join(run_dir, "acc_over_time.png")
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        per_epoch_test_acc_available=("test_acc" in head_histories_per_task[0]),
+        test_end_accs=test_end_accs,  # or your list if you have it
+        title="MNIST Continual: Head-Only Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_over_time_head_only.png")
     )
+
 
 if __name__ == "__main__":
     main()

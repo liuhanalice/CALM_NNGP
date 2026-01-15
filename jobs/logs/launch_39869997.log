@@ -1,0 +1,1637 @@
+python -u CL_Driver.py --no_checkpoint --log_every_epoch --epochs=30 --lambda_rec=1.0 --GP_train_size_per_class=2000 --GP_test_size_per_class=1000 --GP_train_otc_size=50 --GP_num_indcpts=1000 --GP_package=laGP
+
+
+/var/spool/slurmd.spool/job39869997/slurm_script: line 23: eacho: command not found
+/home/lhalice/miniconda3/envs/NNGP/bin/python
+Python 3.12.12
+python: /home/lhalice/miniconda3/envs/NNGP/bin/python
+torch: 2.9.1+cu126
+cuda available: True
+Wed Jan 14 16:17:51 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.105.08             Driver Version: 580.105.08     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla V100-PCIE-16GB           On  |   00000000:D8:00.0 Off |                    0 |
+| N/A   26C    P0             24W /  250W |       0MiB /  16384MiB |      0%   E. Process |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+=== Conda Env ===
+
+# conda environments:
+#
+base                   /home/lhalice/miniconda3
+EIS                    /home/lhalice/miniconda3/envs/EIS
+NNGP                 * /home/lhalice/miniconda3/envs/NNGP
+
+=== GPU Info ===
+Wed Jan 14 16:17:52 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.105.08             Driver Version: 580.105.08     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla V100-PCIE-16GB           On  |   00000000:D8:00.0 Off |                    0 |
+| N/A   26C    P0             24W /  250W |       0MiB /  16384MiB |      0%   E. Process |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+=== R ===
+/sw/pkgs/arc/stacks/gcc/13.2.0/R/4.5.1/bin/R
+R version 4.5.1 (2025-06-13) -- "Great Square Root"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under the terms of the
+GNU General Public License versions 2 or 3.
+For more information about these matters see
+https://www.gnu.org/licenses/.
+
+Device: cuda; f_size=16
+
+================================================================================
+Starting Task 0: digits [0, 1, 2, 3, 4]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.1589 | rec 0.1589 | feat 0.0000 | train_acc 8.37% | test_acc 20.08%
+[Stage1/AE] Epoch 2/30 | loss 0.0788 | rec 0.0788 | feat 0.0000 | train_acc 19.52% | test_acc 20.08%
+[Stage1/AE] Epoch 3/30 | loss 0.0726 | rec 0.0726 | feat 0.0000 | train_acc 19.52% | test_acc 20.08%
+[Stage1/AE] Epoch 4/30 | loss 0.0651 | rec 0.0651 | feat 0.0000 | train_acc 19.52% | test_acc 20.08%
+[Stage1/AE] Epoch 5/30 | loss 0.0610 | rec 0.0610 | feat 0.0000 | train_acc 19.52% | test_acc 20.08%
+[Stage1/AE] Epoch 6/30 | loss 0.0575 | rec 0.0575 | feat 0.0000 | train_acc 19.52% | test_acc 20.08%
+[Stage1/AE] Epoch 7/30 | loss 0.0534 | rec 0.0534 | feat 0.0000 | train_acc 19.51% | test_acc 20.08%
+[Stage1/AE] Epoch 8/30 | loss 0.0496 | rec 0.0496 | feat 0.0000 | train_acc 19.51% | test_acc 20.08%
+[Stage1/AE] Epoch 9/30 | loss 0.0472 | rec 0.0472 | feat 0.0000 | train_acc 19.49% | test_acc 20.08%
+[Stage1/AE] Epoch 10/30 | loss 0.0454 | rec 0.0454 | feat 0.0000 | train_acc 19.39% | test_acc 20.00%
+[Stage1/AE] Epoch 11/30 | loss 0.0439 | rec 0.0439 | feat 0.0000 | train_acc 19.21% | test_acc 19.73%
+[Stage1/AE] Epoch 12/30 | loss 0.0424 | rec 0.0424 | feat 0.0000 | train_acc 18.86% | test_acc 19.36%
+[Stage1/AE] Epoch 13/30 | loss 0.0409 | rec 0.0409 | feat 0.0000 | train_acc 18.33% | test_acc 18.66%
+[Stage1/AE] Epoch 14/30 | loss 0.0398 | rec 0.0398 | feat 0.0000 | train_acc 17.69% | test_acc 18.31%
+[Stage1/AE] Epoch 15/30 | loss 0.0387 | rec 0.0387 | feat 0.0000 | train_acc 17.49% | test_acc 18.06%
+[Stage1/AE] Epoch 16/30 | loss 0.0380 | rec 0.0380 | feat 0.0000 | train_acc 17.20% | test_acc 17.73%
+[Stage1/AE] Epoch 17/30 | loss 0.0374 | rec 0.0374 | feat 0.0000 | train_acc 17.00% | test_acc 17.61%
+[Stage1/AE] Epoch 18/30 | loss 0.0368 | rec 0.0368 | feat 0.0000 | train_acc 16.85% | test_acc 17.63%
+[Stage1/AE] Epoch 19/30 | loss 0.0363 | rec 0.0363 | feat 0.0000 | train_acc 16.68% | test_acc 17.61%
+[Stage1/AE] Epoch 20/30 | loss 0.0359 | rec 0.0359 | feat 0.0000 | train_acc 16.65% | test_acc 17.26%
+[Stage1/AE] Epoch 21/30 | loss 0.0354 | rec 0.0354 | feat 0.0000 | train_acc 16.50% | test_acc 17.42%
+[Stage1/AE] Epoch 22/30 | loss 0.0349 | rec 0.0349 | feat 0.0000 | train_acc 16.36% | test_acc 17.09%
+[Stage1/AE] Epoch 23/30 | loss 0.0344 | rec 0.0344 | feat 0.0000 | train_acc 16.37% | test_acc 17.12%
+[Stage1/AE] Epoch 24/30 | loss 0.0341 | rec 0.0341 | feat 0.0000 | train_acc 16.31% | test_acc 16.97%
+[Stage1/AE] Epoch 25/30 | loss 0.0336 | rec 0.0336 | feat 0.0000 | train_acc 16.15% | test_acc 17.01%
+[Stage1/AE] Epoch 26/30 | loss 0.0333 | rec 0.0333 | feat 0.0000 | train_acc 16.05% | test_acc 16.81%
+[Stage1/AE] Epoch 27/30 | loss 0.0330 | rec 0.0330 | feat 0.0000 | train_acc 15.98% | test_acc 16.68%
+[Stage1/AE] Epoch 28/30 | loss 0.0326 | rec 0.0326 | feat 0.0000 | train_acc 15.83% | test_acc 16.87%
+[Stage1/AE] Epoch 29/30 | loss 0.0323 | rec 0.0323 | feat 0.0000 | train_acc 15.93% | test_acc 16.72%
+[Stage1/AE] Epoch 30/30 | loss 0.0322 | rec 0.0322 | feat 0.0000 | train_acc 16.01% | test_acc 16.68%
+[Stage2/Head] Epoch 1/30 | loss 2.0027 | ce 2.0027 | logit 0.0000 | train_acc 33.86% | test_acc 69.10%
+[Stage2/Head] Epoch 2/30 | loss 1.5506 | ce 1.5506 | logit 0.0000 | train_acc 84.31% | test_acc 94.30%
+[Stage2/Head] Epoch 3/30 | loss 1.2393 | ce 1.2393 | logit 0.0000 | train_acc 90.58% | test_acc 94.73%
+[Stage2/Head] Epoch 4/30 | loss 1.0072 | ce 1.0072 | logit 0.0000 | train_acc 91.33% | test_acc 95.12%
+[Stage2/Head] Epoch 5/30 | loss 0.8291 | ce 0.8291 | logit 0.0000 | train_acc 91.92% | test_acc 95.78%
+[Stage2/Head] Epoch 6/30 | loss 0.6946 | ce 0.6946 | logit 0.0000 | train_acc 92.48% | test_acc 95.95%
+[Stage2/Head] Epoch 7/30 | loss 0.5976 | ce 0.5976 | logit 0.0000 | train_acc 92.26% | test_acc 96.13%
+[Stage2/Head] Epoch 8/30 | loss 0.5209 | ce 0.5209 | logit 0.0000 | train_acc 92.67% | test_acc 96.28%
+[Stage2/Head] Epoch 9/30 | loss 0.4649 | ce 0.4649 | logit 0.0000 | train_acc 92.70% | test_acc 96.32%
+[Stage2/Head] Epoch 10/30 | loss 0.4202 | ce 0.4202 | logit 0.0000 | train_acc 92.79% | test_acc 96.28%
+[Stage2/Head] Epoch 11/30 | loss 0.3856 | ce 0.3856 | logit 0.0000 | train_acc 92.81% | test_acc 96.44%
+[Stage2/Head] Epoch 12/30 | loss 0.3565 | ce 0.3565 | logit 0.0000 | train_acc 92.97% | test_acc 96.48%
+[Stage2/Head] Epoch 13/30 | loss 0.3296 | ce 0.3296 | logit 0.0000 | train_acc 93.25% | test_acc 96.65%
+[Stage2/Head] Epoch 14/30 | loss 0.3141 | ce 0.3141 | logit 0.0000 | train_acc 93.17% | test_acc 96.65%
+[Stage2/Head] Epoch 15/30 | loss 0.3014 | ce 0.3014 | logit 0.0000 | train_acc 93.07% | test_acc 96.56%
+[Stage2/Head] Epoch 16/30 | loss 0.2867 | ce 0.2867 | logit 0.0000 | train_acc 93.09% | test_acc 96.85%
+[Stage2/Head] Epoch 17/30 | loss 0.2768 | ce 0.2768 | logit 0.0000 | train_acc 92.99% | test_acc 96.81%
+[Stage2/Head] Epoch 18/30 | loss 0.2667 | ce 0.2667 | logit 0.0000 | train_acc 93.36% | test_acc 96.71%
+[Stage2/Head] Epoch 19/30 | loss 0.2612 | ce 0.2612 | logit 0.0000 | train_acc 93.26% | test_acc 96.85%
+[Stage2/Head] Epoch 20/30 | loss 0.2492 | ce 0.2492 | logit 0.0000 | train_acc 93.61% | test_acc 96.89%
+[Stage2/Head] Epoch 21/30 | loss 0.2441 | ce 0.2441 | logit 0.0000 | train_acc 93.52% | test_acc 96.98%
+[Stage2/Head] Epoch 22/30 | loss 0.2402 | ce 0.2402 | logit 0.0000 | train_acc 93.50% | test_acc 97.10%
+[Stage2/Head] Epoch 23/30 | loss 0.2369 | ce 0.2369 | logit 0.0000 | train_acc 93.42% | test_acc 96.94%
+[Stage2/Head] Epoch 24/30 | loss 0.2319 | ce 0.2319 | logit 0.0000 | train_acc 93.45% | test_acc 97.00%
+[Stage2/Head] Epoch 25/30 | loss 0.2275 | ce 0.2275 | logit 0.0000 | train_acc 93.59% | test_acc 97.24%
+[Stage2/Head] Epoch 26/30 | loss 0.2243 | ce 0.2243 | logit 0.0000 | train_acc 93.45% | test_acc 97.20%
+[Stage2/Head] Epoch 27/30 | loss 0.2237 | ce 0.2237 | logit 0.0000 | train_acc 93.48% | test_acc 97.16%
+[Stage2/Head] Epoch 28/30 | loss 0.2128 | ce 0.2128 | logit 0.0000 | train_acc 94.02% | test_acc 97.24%
+[Stage2/Head] Epoch 29/30 | loss 0.2086 | ce 0.2086 | logit 0.0000 | train_acc 93.99% | test_acc 97.31%
+[Stage2/Head] Epoch 30/30 | loss 0.2154 | ce 0.2154 | logit 0.0000 | train_acc 93.69% | test_acc 97.28%
+[Task 0] Training done in 1.93 min.
+[Task 0] Test (new data) -> ce_loss: 0.1252, acc: 97.28%, rec_loss: 20.6554
+[Task 0] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task0
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 97.28%
+Mean over seen tasks (0..0): 97.28%
+[Task 0] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task0/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task0 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 635"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class0: 1.76552738075738"
+[1] 1000   16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 710"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class1: 0.853367878860217"
+[1] 2000   16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 636"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class2: 3.10147305724291"
+[1] 3000   16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 655"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class3: 2.31596305760781"
+[1] 4000   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 616"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class4: 2.36752610069993"
+[1] 5000   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 5000"
+[1] "total test df size: 5000"
+ num [1:5000] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4 
+ 953 1103 1006  983  955 
+[1] "class 0 test data size:953"
+[1] "class 1 test data size:1103"
+[1] "class 2 test data size:1006"
+[1] "class 3 test data size:983"
+[1] "class 4 test data size:955"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.9664"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             942              41
+Predicted_Negative              11            4006
+[1] "Accuracy: 0.9896"
+[1] "Precision: 0.958290946083418"
+[1] "Recall for Class: 0.988457502623295"
+[1] "F1 Score for Class: 0.973140495867769"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive            1088              12
+Predicted_Negative              15            3885
+[1] "Accuracy: 0.9946"
+[1] "Precision: 0.989090909090909"
+[1] "Recall for Class: 0.986400725294651"
+[1] "F1 Score for Class: 0.987743985474353"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             946              46
+Predicted_Negative              60            3948
+[1] "Accuracy: 0.9788"
+[1] "Precision: 0.953629032258065"
+[1] "Recall for Class: 0.940357852882704"
+[1] "F1 Score for Class: 0.946946946946947"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             918              19
+Predicted_Negative              65            3998
+[1] "Accuracy: 0.9832"
+[1] "Precision: 0.979722518676628"
+[1] "Recall for Class: 0.933875890132248"
+[1] "F1 Score for Class: 0.95625"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             938              50
+Predicted_Negative              17            3995
+[1] "Accuracy: 0.9866"
+[1] "Precision: 0.949392712550607"
+[1] "Recall for Class: 0.982198952879581"
+[1] "F1 Score for Class: 0.96551724137931"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4:"
+[1] "mean: 0.944266981503258, 0.0357633951571124, 0.00317412456037014, 0.0790433715415179, 0.0450867686417164"
+[1] "sd: 0.0850802228440515, 0.114993553425291, 0.223196844494881, 0.300139713592495, 0.356061164825776"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4:"
+[1] "mean: -0.00167474537257235, 0.947122807986033, 0.0217708836352936, 0.00900190938063734, -0.00413194347758501"
+[1] "sd: 0.0310096244564369, 0.0956776976647512, 0.101808378421002, 0.113125112255643, 0.115941843302695"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4:"
+[1] "mean: -0.010980117694045, -0.0219934511762329, 0.877325281164499, -0.0112131634147166, -0.0968000692648945"
+[1] "sd: 0.212409486636934, 0.199591778750059, 0.19117709384351, 0.327788924148716, 0.289606465435385"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4:"
+[1] "mean: -0.0467705868240502, -0.0392044859217777, -0.067792811975545, 0.881380551605441, -0.0434933992351386"
+[1] "sd: 0.179225172726521, 0.197660905112272, 0.320315668921458, 0.17673093870513, 0.196776323073506"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4:"
+[1] "mean: 0.0519597271640584, -0.033923066243189, -0.252364197089673, 0.0132164073041811, 0.933059422349206"
+[1] "sd: 0.188578656580543, 0.211346167129132, 0.43317527701365, 0.253728372802975, 0.109681979031204"
+[1] "---------------------"
+Warning messages:
+1: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+2: Removed 277 rows containing missing values or values outside the scale range
+(`geom_line()`). 
+[1] "Save Results"
+null device 
+          1 
+[Task 0] Loaded from R CSV: 5000 rows, f_size=16
+[Task 0] Decoded images: torch.Size([5000, 1, 28, 28]) -> recovered dataset size 5000
+[Task 0] Augmenting Task 1 training set with 5000 recovered samples.
+/home/lhalice/miniconda3/envs/NNGP/lib/python3.12/site-packages/torch/utils/data/dataloader.py:627: UserWarning: This DataLoader will create 2 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+[Task 0] Caching f_size features for feature-preservation in next task...
+[Task 0] Cached features: 30596 items.
+
+================================================================================
+Starting Task 1: digits [5]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.0212 | rec 0.0212 | feat 0.0000 | train_acc 58.84% | test_acc 48.49%
+[Stage1/AE] Epoch 2/30 | loss 0.0203 | rec 0.0203 | feat 0.0000 | train_acc 58.84% | test_acc 48.50%
+[Stage1/AE] Epoch 3/30 | loss 0.0197 | rec 0.0197 | feat 0.0000 | train_acc 58.62% | test_acc 48.38%
+[Stage1/AE] Epoch 4/30 | loss 0.0194 | rec 0.0194 | feat 0.0000 | train_acc 58.75% | test_acc 48.29%
+[Stage1/AE] Epoch 5/30 | loss 0.0191 | rec 0.0191 | feat 0.0000 | train_acc 58.59% | test_acc 48.17%
+[Stage1/AE] Epoch 6/30 | loss 0.0189 | rec 0.0189 | feat 0.0000 | train_acc 58.35% | test_acc 48.21%
+[Stage1/AE] Epoch 7/30 | loss 0.0187 | rec 0.0187 | feat 0.0000 | train_acc 58.39% | test_acc 48.20%
+[Stage1/AE] Epoch 8/30 | loss 0.0185 | rec 0.0185 | feat 0.0000 | train_acc 58.45% | test_acc 48.17%
+[Stage1/AE] Epoch 9/30 | loss 0.0183 | rec 0.0183 | feat 0.0000 | train_acc 58.49% | test_acc 48.11%
+[Stage1/AE] Epoch 10/30 | loss 0.0182 | rec 0.0182 | feat 0.0000 | train_acc 58.46% | test_acc 48.06%
+[Stage1/AE] Epoch 11/30 | loss 0.0180 | rec 0.0180 | feat 0.0000 | train_acc 58.31% | test_acc 48.04%
+[Stage1/AE] Epoch 12/30 | loss 0.0179 | rec 0.0179 | feat 0.0000 | train_acc 58.60% | test_acc 47.95%
+[Stage1/AE] Epoch 13/30 | loss 0.0177 | rec 0.0177 | feat 0.0000 | train_acc 58.33% | test_acc 47.98%
+[Stage1/AE] Epoch 14/30 | loss 0.0178 | rec 0.0178 | feat 0.0000 | train_acc 58.34% | test_acc 47.91%
+[Stage1/AE] Epoch 15/30 | loss 0.0176 | rec 0.0176 | feat 0.0000 | train_acc 58.08% | test_acc 47.92%
+[Stage1/AE] Epoch 16/30 | loss 0.0174 | rec 0.0174 | feat 0.0000 | train_acc 58.12% | test_acc 47.91%
+[Stage1/AE] Epoch 17/30 | loss 0.0173 | rec 0.0173 | feat 0.0000 | train_acc 58.00% | test_acc 47.87%
+[Stage1/AE] Epoch 18/30 | loss 0.0173 | rec 0.0173 | feat 0.0000 | train_acc 58.31% | test_acc 47.85%
+[Stage1/AE] Epoch 19/30 | loss 0.0171 | rec 0.0171 | feat 0.0000 | train_acc 58.19% | test_acc 47.68%
+[Stage1/AE] Epoch 20/30 | loss 0.0170 | rec 0.0170 | feat 0.0000 | train_acc 57.91% | test_acc 47.70%
+[Stage1/AE] Epoch 21/30 | loss 0.0169 | rec 0.0169 | feat 0.0000 | train_acc 57.85% | test_acc 47.71%
+[Stage1/AE] Epoch 22/30 | loss 0.0169 | rec 0.0169 | feat 0.0000 | train_acc 58.00% | test_acc 47.74%
+[Stage1/AE] Epoch 23/30 | loss 0.0169 | rec 0.0169 | feat 0.0000 | train_acc 57.96% | test_acc 47.76%
+[Stage1/AE] Epoch 24/30 | loss 0.0168 | rec 0.0168 | feat 0.0000 | train_acc 58.08% | test_acc 47.63%
+[Stage1/AE] Epoch 25/30 | loss 0.0166 | rec 0.0166 | feat 0.0000 | train_acc 58.06% | test_acc 47.64%
+[Stage1/AE] Epoch 26/30 | loss 0.0166 | rec 0.0166 | feat 0.0000 | train_acc 57.89% | test_acc 47.63%
+[Stage1/AE] Epoch 27/30 | loss 0.0165 | rec 0.0165 | feat 0.0000 | train_acc 57.96% | test_acc 47.58%
+[Stage1/AE] Epoch 28/30 | loss 0.0164 | rec 0.0164 | feat 0.0000 | train_acc 58.09% | test_acc 47.58%
+[Stage1/AE] Epoch 29/30 | loss 0.0164 | rec 0.0164 | feat 0.0000 | train_acc 58.11% | test_acc 47.54%
+[Stage1/AE] Epoch 30/30 | loss 0.0163 | rec 0.0163 | feat 0.0000 | train_acc 57.79% | test_acc 47.56%
+[Stage2/Head] Epoch 1/30 | loss 2.0402 | ce 2.0402 | logit 0.0000 | train_acc 57.58% | test_acc 47.84%
+[Stage2/Head] Epoch 2/30 | loss 1.6825 | ce 1.6825 | logit 0.0000 | train_acc 58.11% | test_acc 47.90%
+[Stage2/Head] Epoch 3/30 | loss 1.5397 | ce 1.5397 | logit 0.0000 | train_acc 58.31% | test_acc 47.94%
+[Stage2/Head] Epoch 4/30 | loss 1.4108 | ce 1.4108 | logit 0.0000 | train_acc 58.24% | test_acc 47.91%
+[Stage2/Head] Epoch 5/30 | loss 1.2732 | ce 1.2732 | logit 0.0000 | train_acc 58.16% | test_acc 47.86%
+[Stage2/Head] Epoch 6/30 | loss 1.1544 | ce 1.1544 | logit 0.0000 | train_acc 58.34% | test_acc 47.84%
+[Stage2/Head] Epoch 7/30 | loss 1.0308 | ce 1.0308 | logit 0.0000 | train_acc 58.04% | test_acc 48.02%
+[Stage2/Head] Epoch 8/30 | loss 0.9054 | ce 0.9054 | logit 0.0000 | train_acc 60.42% | test_acc 60.16%
+[Stage2/Head] Epoch 9/30 | loss 0.7651 | ce 0.7651 | logit 0.0000 | train_acc 73.72% | test_acc 81.16%
+[Stage2/Head] Epoch 10/30 | loss 0.6632 | ce 0.6632 | logit 0.0000 | train_acc 83.62% | test_acc 88.93%
+[Stage2/Head] Epoch 11/30 | loss 0.5905 | ce 0.5905 | logit 0.0000 | train_acc 86.99% | test_acc 89.92%
+[Stage2/Head] Epoch 12/30 | loss 0.5288 | ce 0.5288 | logit 0.0000 | train_acc 88.46% | test_acc 92.66%
+[Stage2/Head] Epoch 13/30 | loss 0.4950 | ce 0.4950 | logit 0.0000 | train_acc 89.39% | test_acc 92.89%
+[Stage2/Head] Epoch 14/30 | loss 0.4648 | ce 0.4648 | logit 0.0000 | train_acc 89.74% | test_acc 92.88%
+[Stage2/Head] Epoch 15/30 | loss 0.4389 | ce 0.4389 | logit 0.0000 | train_acc 89.86% | test_acc 93.31%
+[Stage2/Head] Epoch 16/30 | loss 0.4106 | ce 0.4106 | logit 0.0000 | train_acc 90.44% | test_acc 93.32%
+[Stage2/Head] Epoch 17/30 | loss 0.3933 | ce 0.3933 | logit 0.0000 | train_acc 90.41% | test_acc 93.53%
+[Stage2/Head] Epoch 18/30 | loss 0.3839 | ce 0.3839 | logit 0.0000 | train_acc 90.25% | test_acc 93.33%
+[Stage2/Head] Epoch 19/30 | loss 0.3692 | ce 0.3692 | logit 0.0000 | train_acc 90.83% | test_acc 93.35%
+[Stage2/Head] Epoch 20/30 | loss 0.3656 | ce 0.3656 | logit 0.0000 | train_acc 90.75% | test_acc 93.52%
+[Stage2/Head] Epoch 21/30 | loss 0.3470 | ce 0.3470 | logit 0.0000 | train_acc 90.99% | test_acc 93.54%
+[Stage2/Head] Epoch 22/30 | loss 0.3360 | ce 0.3360 | logit 0.0000 | train_acc 91.15% | test_acc 93.61%
+[Stage2/Head] Epoch 23/30 | loss 0.3303 | ce 0.3303 | logit 0.0000 | train_acc 91.09% | test_acc 93.74%
+[Stage2/Head] Epoch 24/30 | loss 0.3309 | ce 0.3309 | logit 0.0000 | train_acc 91.26% | test_acc 93.61%
+[Stage2/Head] Epoch 25/30 | loss 0.3245 | ce 0.3245 | logit 0.0000 | train_acc 91.45% | test_acc 93.76%
+[Stage2/Head] Epoch 26/30 | loss 0.3208 | ce 0.3208 | logit 0.0000 | train_acc 91.11% | test_acc 93.85%
+[Stage2/Head] Epoch 27/30 | loss 0.3138 | ce 0.3138 | logit 0.0000 | train_acc 91.45% | test_acc 93.76%
+[Stage2/Head] Epoch 28/30 | loss 0.3037 | ce 0.3037 | logit 0.0000 | train_acc 91.67% | test_acc 93.92%
+[Stage2/Head] Epoch 29/30 | loss 0.2944 | ce 0.2944 | logit 0.0000 | train_acc 91.78% | test_acc 93.88%
+[Stage2/Head] Epoch 30/30 | loss 0.2979 | ce 0.2979 | logit 0.0000 | train_acc 91.72% | test_acc 93.95%
+[Task 1] Training done in 1.40 min.
+[Task 1] Test (new data) -> ce_loss: 0.1844, acc: 96.64%, rec_loss: 22.8990
+[Task 1] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task1
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 91.26%
+  Task 1 [5]: 96.64%
+Mean over seen tasks (0..1): 93.95%
+[Task 1] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task1/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task1 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class0: 1.18250958549505"
+[1] 800  16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class1: 0.451268130359647"
+[1] 1600   16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class2: 1.68560110422422"
+[1] 2400   16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class3: 1.34159562997311"
+[1] 3200   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class4: 1.27168932016644"
+[1] 4000   16
+[1] "class 5 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 5 validation set sample size (indclude 50 samples from other classes): 650"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class5: 1.64946829128399"
+[1] 5000   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 6000"
+[1] "total test df size: 6000"
+ num [1:6000] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4    5 
+ 980 1135 1032 1010  982  861 
+[1] "class 0 test data size:980"
+[1] "class 1 test data size:1135"
+[1] "class 2 test data size:1032"
+[1] "class 3 test data size:1010"
+[1] "class 4 test data size:982"
+[1] "class 5 test data size:861"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.914333333333333"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             924              40
+Predicted_Negative              56            4980
+[1] "Accuracy: 0.984"
+[1] "Precision: 0.95850622406639"
+[1] "Recall for Class: 0.942857142857143"
+[1] "F1 Score for Class: 0.950617283950617"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive            1113              15
+Predicted_Negative              22            4850
+[1] "Accuracy: 0.993833333333333"
+[1] "Precision: 0.986702127659574"
+[1] "Recall for Class: 0.980616740088106"
+[1] "F1 Score for Class: 0.983650022094565"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             953              75
+Predicted_Negative              79            4893
+[1] "Accuracy: 0.974333333333333"
+[1] "Precision: 0.92704280155642"
+[1] "Recall for Class: 0.923449612403101"
+[1] "F1 Score for Class: 0.925242718446602"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             733              30
+Predicted_Negative             277            4960
+[1] "Accuracy: 0.948833333333333"
+[1] "Precision: 0.960681520314548"
+[1] "Recall for Class: 0.725742574257426"
+[1] "F1 Score for Class: 0.826847151720248"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             931              41
+Predicted_Negative              51            4977
+[1] "Accuracy: 0.984666666666667"
+[1] "Precision: 0.957818930041152"
+[1] "Recall for Class: 0.94806517311609"
+[1] "F1 Score for Class: 0.952917093142272"
+[1] "Confusion Matrix for Class:5"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             832             313
+Predicted_Negative              29            4826
+[1] "Accuracy: 0.943"
+[1] "Precision: 0.726637554585153"
+[1] "Recall for Class: 0.966318234610918"
+[1] "F1 Score for Class: 0.82951146560319"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: 0.814825776563967, -0.00425365877358377, 0.0388365723444623, -0.0471082616403203, -0.0265636891869753, 0.0711969946192853"
+[1] "sd: 0.16291167612575, 0.0876003076553864, 0.172062587268269, 0.143317801362514, 0.19874600496349, 0.169556941405259"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: 0.00283870369818798, 0.917840024505972, 0.00589621632124102, 0.0197418499767372, 0.00903804273565204, 0.0135731546376219"
+[1] "sd: 0.0150604307366386, 0.129942008861395, 0.109416893470659, 0.100954411142763, 0.10579703735219, 0.0619440255220706"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: 0.00395674194264233, -0.0259584561835094, 0.796140470158063, -0.0632799989924231, 0.0724759211817059, -0.0414984979648552"
+[1] "sd: 0.160864895937516, 0.173426098651884, 0.221966470726962, 0.331113110541921, 0.244079970816898, 0.190744053108186"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: -0.0244199231489794, 0.00986328174360643, -0.113834457783196, 0.65338552847592, -0.00898056636297939, -0.0121743226480018"
+[1] "sd: 0.106275393633242, 0.158396501520611, 0.314926290297988, 0.283286855208128, 0.154734863057379, 0.173022539151349"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: -0.0266210937278394, -0.118288023610141, -0.0718319160349482, -0.0494519095116741, 0.878558781280828, 0.00918493365204845"
+[1] "sd: 0.0834979854461498, 0.160794709878844, 0.235523390136638, 0.197819065531449, 0.171919613984246, 0.146380579734231"
+[1] "---------------------"
+[1] "GPc5 distribution statistics for0, 1, 2, 3, 4, 5:"
+[1] "mean: 0.0647943203301504, 0.0173795782509084, -0.00519088806553624, 0.260655102931465, 0.0338568546378745, 0.858884970664821"
+[1] "sd: 0.285369018958355, 0.133895287739585, 0.176886023468263, 0.295869925044319, 0.278444785343681, 0.124713361024908"
+[1] "---------------------"
+Warning message:
+Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+[1] "Save Results"
+null device 
+          1 
+[Task 1] Loaded from R CSV: 5000 rows, f_size=16
+[Task 1] Decoded images: torch.Size([5000, 1, 28, 28]) -> recovered dataset size 5000
+[Task 1] Augmenting Task 2 training set with 5000 recovered samples.
+[Task 1] Caching f_size features for feature-preservation in next task...
+[Task 1] Cached features: 36017 items.
+
+================================================================================
+Starting Task 2: digits [6]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.0184 | rec 0.0184 | feat 0.0000 | train_acc 56.88% | test_acc 62.53%
+[Stage1/AE] Epoch 2/30 | loss 0.0169 | rec 0.0169 | feat 0.0000 | train_acc 56.60% | test_acc 62.61%
+[Stage1/AE] Epoch 3/30 | loss 0.0164 | rec 0.0164 | feat 0.0000 | train_acc 56.23% | test_acc 62.43%
+[Stage1/AE] Epoch 4/30 | loss 0.0159 | rec 0.0159 | feat 0.0000 | train_acc 56.24% | test_acc 62.44%
+[Stage1/AE] Epoch 5/30 | loss 0.0157 | rec 0.0157 | feat 0.0000 | train_acc 56.19% | test_acc 62.37%
+[Stage1/AE] Epoch 6/30 | loss 0.0154 | rec 0.0154 | feat 0.0000 | train_acc 56.65% | test_acc 62.38%
+[Stage1/AE] Epoch 7/30 | loss 0.0153 | rec 0.0153 | feat 0.0000 | train_acc 56.35% | test_acc 62.46%
+[Stage1/AE] Epoch 8/30 | loss 0.0150 | rec 0.0150 | feat 0.0000 | train_acc 56.69% | test_acc 62.31%
+[Stage1/AE] Epoch 9/30 | loss 0.0149 | rec 0.0149 | feat 0.0000 | train_acc 56.10% | test_acc 62.37%
+[Stage1/AE] Epoch 10/30 | loss 0.0148 | rec 0.0148 | feat 0.0000 | train_acc 56.19% | test_acc 62.42%
+[Stage1/AE] Epoch 11/30 | loss 0.0145 | rec 0.0145 | feat 0.0000 | train_acc 56.16% | test_acc 62.27%
+[Stage1/AE] Epoch 12/30 | loss 0.0145 | rec 0.0145 | feat 0.0000 | train_acc 56.17% | test_acc 62.14%
+[Stage1/AE] Epoch 13/30 | loss 0.0143 | rec 0.0143 | feat 0.0000 | train_acc 56.05% | test_acc 62.24%
+[Stage1/AE] Epoch 14/30 | loss 0.0143 | rec 0.0143 | feat 0.0000 | train_acc 56.17% | test_acc 62.29%
+[Stage1/AE] Epoch 15/30 | loss 0.0142 | rec 0.0142 | feat 0.0000 | train_acc 56.34% | test_acc 62.17%
+[Stage1/AE] Epoch 16/30 | loss 0.0140 | rec 0.0140 | feat 0.0000 | train_acc 55.98% | test_acc 62.34%
+[Stage1/AE] Epoch 17/30 | loss 0.0140 | rec 0.0140 | feat 0.0000 | train_acc 56.34% | test_acc 62.22%
+[Stage1/AE] Epoch 18/30 | loss 0.0139 | rec 0.0139 | feat 0.0000 | train_acc 56.29% | test_acc 62.24%
+[Stage1/AE] Epoch 19/30 | loss 0.0138 | rec 0.0138 | feat 0.0000 | train_acc 56.17% | test_acc 62.24%
+[Stage1/AE] Epoch 20/30 | loss 0.0137 | rec 0.0137 | feat 0.0000 | train_acc 56.33% | test_acc 62.37%
+[Stage1/AE] Epoch 21/30 | loss 0.0136 | rec 0.0136 | feat 0.0000 | train_acc 56.25% | test_acc 62.27%
+[Stage1/AE] Epoch 22/30 | loss 0.0136 | rec 0.0136 | feat 0.0000 | train_acc 56.06% | test_acc 62.32%
+[Stage1/AE] Epoch 23/30 | loss 0.0135 | rec 0.0135 | feat 0.0000 | train_acc 56.25% | test_acc 62.32%
+[Stage1/AE] Epoch 24/30 | loss 0.0134 | rec 0.0134 | feat 0.0000 | train_acc 56.42% | test_acc 62.23%
+[Stage1/AE] Epoch 25/30 | loss 0.0133 | rec 0.0133 | feat 0.0000 | train_acc 56.29% | test_acc 62.32%
+[Stage1/AE] Epoch 26/30 | loss 0.0133 | rec 0.0133 | feat 0.0000 | train_acc 56.25% | test_acc 62.30%
+[Stage1/AE] Epoch 27/30 | loss 0.0132 | rec 0.0132 | feat 0.0000 | train_acc 56.19% | test_acc 62.29%
+[Stage1/AE] Epoch 28/30 | loss 0.0132 | rec 0.0132 | feat 0.0000 | train_acc 55.91% | test_acc 62.33%
+[Stage1/AE] Epoch 29/30 | loss 0.0132 | rec 0.0132 | feat 0.0000 | train_acc 56.21% | test_acc 62.26%
+[Stage1/AE] Epoch 30/30 | loss 0.0131 | rec 0.0131 | feat 0.0000 | train_acc 56.29% | test_acc 62.19%
+[Stage2/Head] Epoch 1/30 | loss 2.7360 | ce 2.7360 | logit 0.0000 | train_acc 52.85% | test_acc 52.00%
+[Stage2/Head] Epoch 2/30 | loss 2.4028 | ce 2.4028 | logit 0.0000 | train_acc 53.80% | test_acc 55.71%
+[Stage2/Head] Epoch 3/30 | loss 2.2035 | ce 2.2035 | logit 0.0000 | train_acc 55.46% | test_acc 61.44%
+[Stage2/Head] Epoch 4/30 | loss 1.9767 | ce 1.9767 | logit 0.0000 | train_acc 56.49% | test_acc 61.38%
+[Stage2/Head] Epoch 5/30 | loss 1.8063 | ce 1.8063 | logit 0.0000 | train_acc 56.23% | test_acc 61.60%
+[Stage2/Head] Epoch 6/30 | loss 1.6708 | ce 1.6708 | logit 0.0000 | train_acc 56.01% | test_acc 61.44%
+[Stage2/Head] Epoch 7/30 | loss 1.5361 | ce 1.5361 | logit 0.0000 | train_acc 56.11% | test_acc 61.96%
+[Stage2/Head] Epoch 8/30 | loss 1.4170 | ce 1.4170 | logit 0.0000 | train_acc 56.45% | test_acc 61.82%
+[Stage2/Head] Epoch 9/30 | loss 1.3008 | ce 1.3008 | logit 0.0000 | train_acc 56.49% | test_acc 61.80%
+[Stage2/Head] Epoch 10/30 | loss 1.1934 | ce 1.1934 | logit 0.0000 | train_acc 56.58% | test_acc 61.96%
+[Stage2/Head] Epoch 11/30 | loss 1.0968 | ce 1.0968 | logit 0.0000 | train_acc 56.02% | test_acc 61.60%
+[Stage2/Head] Epoch 12/30 | loss 0.9985 | ce 0.9985 | logit 0.0000 | train_acc 56.50% | test_acc 61.98%
+[Stage2/Head] Epoch 13/30 | loss 0.9136 | ce 0.9136 | logit 0.0000 | train_acc 56.45% | test_acc 62.14%
+[Stage2/Head] Epoch 14/30 | loss 0.8311 | ce 0.8311 | logit 0.0000 | train_acc 56.77% | test_acc 62.09%
+[Stage2/Head] Epoch 15/30 | loss 0.7703 | ce 0.7703 | logit 0.0000 | train_acc 70.80% | test_acc 91.40%
+[Stage2/Head] Epoch 16/30 | loss 0.7033 | ce 0.7033 | logit 0.0000 | train_acc 88.95% | test_acc 91.28%
+[Stage2/Head] Epoch 17/30 | loss 0.6494 | ce 0.6494 | logit 0.0000 | train_acc 90.11% | test_acc 91.32%
+[Stage2/Head] Epoch 18/30 | loss 0.5925 | ce 0.5925 | logit 0.0000 | train_acc 91.01% | test_acc 90.83%
+[Stage2/Head] Epoch 19/30 | loss 0.5533 | ce 0.5533 | logit 0.0000 | train_acc 91.16% | test_acc 90.65%
+[Stage2/Head] Epoch 20/30 | loss 0.5247 | ce 0.5247 | logit 0.0000 | train_acc 90.83% | test_acc 91.15%
+[Stage2/Head] Epoch 21/30 | loss 0.4847 | ce 0.4847 | logit 0.0000 | train_acc 91.66% | test_acc 91.26%
+[Stage2/Head] Epoch 22/30 | loss 0.4674 | ce 0.4674 | logit 0.0000 | train_acc 91.15% | test_acc 90.48%
+[Stage2/Head] Epoch 23/30 | loss 0.4371 | ce 0.4371 | logit 0.0000 | train_acc 91.47% | test_acc 90.49%
+[Stage2/Head] Epoch 24/30 | loss 0.4223 | ce 0.4223 | logit 0.0000 | train_acc 91.29% | test_acc 90.95%
+[Stage2/Head] Epoch 25/30 | loss 0.3966 | ce 0.3966 | logit 0.0000 | train_acc 91.81% | test_acc 90.71%
+[Stage2/Head] Epoch 26/30 | loss 0.3844 | ce 0.3844 | logit 0.0000 | train_acc 92.10% | test_acc 91.22%
+[Stage2/Head] Epoch 27/30 | loss 0.3760 | ce 0.3760 | logit 0.0000 | train_acc 91.90% | test_acc 91.05%
+[Stage2/Head] Epoch 28/30 | loss 0.3642 | ce 0.3642 | logit 0.0000 | train_acc 92.00% | test_acc 90.51%
+[Stage2/Head] Epoch 29/30 | loss 0.3636 | ce 0.3636 | logit 0.0000 | train_acc 91.72% | test_acc 90.78%
+[Stage2/Head] Epoch 30/30 | loss 0.3495 | ce 0.3495 | logit 0.0000 | train_acc 92.06% | test_acc 91.03%
+[Task 2] Training done in 1.51 min.
+[Task 2] Test (new data) -> ce_loss: 0.3057, acc: 96.97%, rec_loss: 17.7064
+[Task 2] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task2
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 89.45%
+  Task 1 [5]: 86.66%
+  Task 2 [6]: 96.97%
+Mean over seen tasks (0..2): 91.03%
+[Task 2] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task2/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task2 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class0: 1.04098314237816"
+[1] 640  16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class1: 0.338043242120723"
+[1] 1280   16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class2: 1.40421449408797"
+[1] 1920   16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class3: 1.51350372277232"
+[1] 2560   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class4: 0.880261782537365"
+[1] 3200   16
+[1] "class 5 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 5 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class5: 1.78730012584013"
+[1] 4000   16
+[1] "class 6 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 6 validation set sample size (indclude 50 samples from other classes): 650"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class6: 2.05745604285239"
+[1] 5000   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 7000"
+[1] "n_ts is greater than the number of rows in the data frame, using all rows:6989"
+[1] "total test df size: 6989"
+ num [1:6989] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4    5    6 
+ 980 1135 1032 1010  982  892  958 
+[1] "class 0 test data size:980"
+[1] "class 1 test data size:1135"
+[1] "class 2 test data size:1032"
+[1] "class 3 test data size:1010"
+[1] "class 4 test data size:982"
+[1] "class 5 test data size:892"
+[1] "class 6 test data size:958"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.875661754185148"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             853              24
+Predicted_Negative             127            5985
+[1] "Accuracy: 0.978394620117327"
+[1] "Precision: 0.972633979475485"
+[1] "Recall for Class: 0.870408163265306"
+[1] "F1 Score for Class: 0.91868605277329"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive            1066              11
+Predicted_Negative              69            5843
+[1] "Accuracy: 0.988553441121763"
+[1] "Precision: 0.989786443825441"
+[1] "Recall for Class: 0.93920704845815"
+[1] "F1 Score for Class: 0.963833634719711"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             870              29
+Predicted_Negative             162            5928
+[1] "Accuracy: 0.972671340678209"
+[1] "Precision: 0.967741935483871"
+[1] "Recall for Class: 0.843023255813954"
+[1] "F1 Score for Class: 0.90108751941999"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             781              62
+Predicted_Negative             229            5917
+[1] "Accuracy: 0.958363142080412"
+[1] "Precision: 0.926453143534994"
+[1] "Recall for Class: 0.773267326732673"
+[1] "F1 Score for Class: 0.842957366432812"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             883              28
+Predicted_Negative              99            5979
+[1] "Accuracy: 0.981828587780798"
+[1] "Precision: 0.969264544456641"
+[1] "Recall for Class: 0.89918533604888"
+[1] "F1 Score for Class: 0.932910723718965"
+[1] "Confusion Matrix for Class:5"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             733             151
+Predicted_Negative             159            5946
+[1] "Accuracy: 0.955644584346831"
+[1] "Precision: 0.829185520361991"
+[1] "Recall for Class: 0.821748878923767"
+[1] "F1 Score for Class: 0.82545045045045"
+[1] "Confusion Matrix for Class:6"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             934             564
+Predicted_Negative              24            5467
+[1] "Accuracy: 0.915867792244956"
+[1] "Precision: 0.623497997329773"
+[1] "Recall for Class: 0.974947807933194"
+[1] "F1 Score for Class: 0.760586319218241"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.738360856191912, 0.0156936961362439, 0.00957305664310593, -0.000520848239469464, 0.00620722836990614, 0.0651032531008056, 0.0541929016136868"
+[1] "sd: 0.199008499774376, 0.0456842262211699, 0.0848808123498729, 0.0883013983908126, 0.107590020611897, 0.172749984219841, 0.118525127413885"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.00147945563026541, 0.871292541711723, 0.0143224324951168, 0.0250182628314034, 0.011733636752355, 0.009519284521851, 0.0119234398212792"
+[1] "sd: 0.00582499511003191, 0.199954638530329, 0.0692020994561201, 0.0762430551710147, 0.0692536919268305, 0.0223250960717735, 0.0496861044320733"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.00255544495024805, 0.0278252939457072, 0.697473991239857, -0.0177543055450173, 0.0211897644310686, 0.0150182783295458, 0.0166700504873111"
+[1] "sd: 0.112296602735507, 0.0821948972644147, 0.272620281475774, 0.233259033008611, 0.188012512071422, 0.104436987147822, 0.0865299733203055"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: -0.014673926080481, 0.00538982703600837, -0.0155651659942558, 0.646479693778427, 0.0737128099602194, -0.0118499428965815, 0.0100409172711078"
+[1] "sd: 0.0901982313140545, 0.10692491754249, 0.287076999308793, 0.279257639783116, 0.137994143738903, 0.217666260263603, 0.0596138086170791"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.00437847576634761, -0.00235194305966529, 0.00874809348763457, 0.00863550460731605, 0.796112654138215, 0.0438886733130836, 0.0223642221036347"
+[1] "sd: 0.0287921860253797, 0.0507077560468627, 0.137433227209527, 0.132775234705454, 0.198813723964888, 0.128135329436885, 0.0832110195624922"
+[1] "---------------------"
+[1] "GPc5 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.0576110021281978, 0.0154348707673614, 0.0209590267490766, 0.0830421236749743, 0.123579373357685, 0.717149384387554, 0.0511904033956427"
+[1] "sd: 0.19896680262332, 0.0397438930201932, 0.0838658008504385, 0.305566426289066, 0.203664787506857, 0.262056910650923, 0.108305531388494"
+[1] "---------------------"
+[1] "GPc6 distribution statistics for0, 1, 2, 3, 4, 5, 6:"
+[1] "mean: 0.111923676655726, 0.00336593707125144, 0.163533076058827, 0.175887911875674, 0.164081418650873, 0.0773594247559177, 0.765010426330038"
+[1] "sd: 0.374123570264914, 0.289454363947241, 0.302400109415568, 0.234750729012658, 0.282776051193306, 0.38909398200863, 0.113276139244899"
+[1] "---------------------"
+Warning messages:
+1: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+2: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+[1] "Save Results"
+null device 
+          1 
+[Task 2] Loaded from R CSV: 5000 rows, f_size=16
+[Task 2] Decoded images: torch.Size([5000, 1, 28, 28]) -> recovered dataset size 5000
+[Task 2] Augmenting Task 3 training set with 5000 recovered samples.
+[Task 2] Caching f_size features for feature-preservation in next task...
+[Task 2] Cached features: 41935 items.
+
+================================================================================
+Starting Task 3: digits [7]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.0171 | rec 0.0171 | feat 0.0000 | train_acc 56.35% | test_acc 66.94%
+[Stage1/AE] Epoch 2/30 | loss 0.0153 | rec 0.0153 | feat 0.0000 | train_acc 56.34% | test_acc 66.53%
+[Stage1/AE] Epoch 3/30 | loss 0.0146 | rec 0.0146 | feat 0.0000 | train_acc 56.38% | test_acc 65.97%
+[Stage1/AE] Epoch 4/30 | loss 0.0142 | rec 0.0142 | feat 0.0000 | train_acc 55.73% | test_acc 65.89%
+[Stage1/AE] Epoch 5/30 | loss 0.0138 | rec 0.0138 | feat 0.0000 | train_acc 56.11% | test_acc 65.57%
+[Stage1/AE] Epoch 6/30 | loss 0.0135 | rec 0.0135 | feat 0.0000 | train_acc 55.80% | test_acc 65.34%
+[Stage1/AE] Epoch 7/30 | loss 0.0132 | rec 0.0132 | feat 0.0000 | train_acc 55.69% | test_acc 64.62%
+[Stage1/AE] Epoch 8/30 | loss 0.0132 | rec 0.0132 | feat 0.0000 | train_acc 55.29% | test_acc 64.61%
+[Stage1/AE] Epoch 9/30 | loss 0.0130 | rec 0.0130 | feat 0.0000 | train_acc 55.38% | test_acc 64.49%
+[Stage1/AE] Epoch 10/30 | loss 0.0128 | rec 0.0128 | feat 0.0000 | train_acc 55.56% | test_acc 64.29%
+[Stage1/AE] Epoch 11/30 | loss 0.0127 | rec 0.0127 | feat 0.0000 | train_acc 55.46% | test_acc 64.57%
+[Stage1/AE] Epoch 12/30 | loss 0.0127 | rec 0.0127 | feat 0.0000 | train_acc 54.91% | test_acc 64.47%
+[Stage1/AE] Epoch 13/30 | loss 0.0125 | rec 0.0125 | feat 0.0000 | train_acc 55.46% | test_acc 64.27%
+[Stage1/AE] Epoch 14/30 | loss 0.0124 | rec 0.0124 | feat 0.0000 | train_acc 55.00% | test_acc 64.69%
+[Stage1/AE] Epoch 15/30 | loss 0.0123 | rec 0.0123 | feat 0.0000 | train_acc 55.39% | test_acc 64.14%
+[Stage1/AE] Epoch 16/30 | loss 0.0123 | rec 0.0123 | feat 0.0000 | train_acc 55.51% | test_acc 63.92%
+[Stage1/AE] Epoch 17/30 | loss 0.0121 | rec 0.0121 | feat 0.0000 | train_acc 55.66% | test_acc 64.00%
+[Stage1/AE] Epoch 18/30 | loss 0.0122 | rec 0.0122 | feat 0.0000 | train_acc 54.95% | test_acc 63.99%
+[Stage1/AE] Epoch 19/30 | loss 0.0120 | rec 0.0120 | feat 0.0000 | train_acc 54.80% | test_acc 63.76%
+[Stage1/AE] Epoch 20/30 | loss 0.0120 | rec 0.0120 | feat 0.0000 | train_acc 55.40% | test_acc 63.68%
+[Stage1/AE] Epoch 21/30 | loss 0.0119 | rec 0.0119 | feat 0.0000 | train_acc 54.86% | test_acc 63.69%
+[Stage1/AE] Epoch 22/30 | loss 0.0119 | rec 0.0119 | feat 0.0000 | train_acc 55.06% | test_acc 63.57%
+[Stage1/AE] Epoch 23/30 | loss 0.0118 | rec 0.0118 | feat 0.0000 | train_acc 55.19% | test_acc 63.55%
+[Stage1/AE] Epoch 24/30 | loss 0.0117 | rec 0.0117 | feat 0.0000 | train_acc 55.25% | test_acc 63.49%
+[Stage1/AE] Epoch 25/30 | loss 0.0117 | rec 0.0117 | feat 0.0000 | train_acc 54.95% | test_acc 63.37%
+[Stage1/AE] Epoch 26/30 | loss 0.0117 | rec 0.0117 | feat 0.0000 | train_acc 54.85% | test_acc 63.57%
+[Stage1/AE] Epoch 27/30 | loss 0.0116 | rec 0.0116 | feat 0.0000 | train_acc 55.14% | test_acc 63.56%
+[Stage1/AE] Epoch 28/30 | loss 0.0115 | rec 0.0115 | feat 0.0000 | train_acc 55.27% | test_acc 63.23%
+[Stage1/AE] Epoch 29/30 | loss 0.0115 | rec 0.0115 | feat 0.0000 | train_acc 55.29% | test_acc 63.45%
+[Stage1/AE] Epoch 30/30 | loss 0.0115 | rec 0.0115 | feat 0.0000 | train_acc 55.06% | test_acc 63.43%
+[Stage2/Head] Epoch 1/30 | loss 3.0110 | ce 3.0110 | logit 0.0000 | train_acc 53.61% | test_acc 62.56%
+[Stage2/Head] Epoch 2/30 | loss 2.5733 | ce 2.5733 | logit 0.0000 | train_acc 53.95% | test_acc 63.90%
+[Stage2/Head] Epoch 3/30 | loss 2.3907 | ce 2.3907 | logit 0.0000 | train_acc 55.14% | test_acc 64.51%
+[Stage2/Head] Epoch 4/30 | loss 2.2442 | ce 2.2442 | logit 0.0000 | train_acc 54.89% | test_acc 65.20%
+[Stage2/Head] Epoch 5/30 | loss 2.0960 | ce 2.0960 | logit 0.0000 | train_acc 55.05% | test_acc 65.23%
+[Stage2/Head] Epoch 6/30 | loss 1.9423 | ce 1.9423 | logit 0.0000 | train_acc 55.17% | test_acc 64.80%
+[Stage2/Head] Epoch 7/30 | loss 1.7940 | ce 1.7940 | logit 0.0000 | train_acc 55.19% | test_acc 64.78%
+[Stage2/Head] Epoch 8/30 | loss 1.6447 | ce 1.6447 | logit 0.0000 | train_acc 55.41% | test_acc 64.85%
+[Stage2/Head] Epoch 9/30 | loss 1.5000 | ce 1.5000 | logit 0.0000 | train_acc 55.26% | test_acc 65.76%
+[Stage2/Head] Epoch 10/30 | loss 1.3706 | ce 1.3706 | logit 0.0000 | train_acc 55.70% | test_acc 65.78%
+[Stage2/Head] Epoch 11/30 | loss 1.2507 | ce 1.2507 | logit 0.0000 | train_acc 55.38% | test_acc 65.91%
+[Stage2/Head] Epoch 12/30 | loss 1.1316 | ce 1.1316 | logit 0.0000 | train_acc 55.40% | test_acc 66.20%
+[Stage2/Head] Epoch 13/30 | loss 1.0234 | ce 1.0234 | logit 0.0000 | train_acc 55.79% | test_acc 66.21%
+[Stage2/Head] Epoch 14/30 | loss 0.9230 | ce 0.9230 | logit 0.0000 | train_acc 55.79% | test_acc 67.14%
+[Stage2/Head] Epoch 15/30 | loss 0.8340 | ce 0.8340 | logit 0.0000 | train_acc 72.00% | test_acc 86.20%
+[Stage2/Head] Epoch 16/30 | loss 0.7490 | ce 0.7490 | logit 0.0000 | train_acc 86.61% | test_acc 87.52%
+[Stage2/Head] Epoch 17/30 | loss 0.6924 | ce 0.6924 | logit 0.0000 | train_acc 88.90% | test_acc 87.05%
+[Stage2/Head] Epoch 18/30 | loss 0.6302 | ce 0.6302 | logit 0.0000 | train_acc 89.59% | test_acc 87.29%
+[Stage2/Head] Epoch 19/30 | loss 0.5822 | ce 0.5822 | logit 0.0000 | train_acc 89.96% | test_acc 87.31%
+[Stage2/Head] Epoch 20/30 | loss 0.5497 | ce 0.5497 | logit 0.0000 | train_acc 90.04% | test_acc 86.70%
+[Stage2/Head] Epoch 21/30 | loss 0.5083 | ce 0.5083 | logit 0.0000 | train_acc 90.09% | test_acc 86.67%
+[Stage2/Head] Epoch 22/30 | loss 0.4802 | ce 0.4802 | logit 0.0000 | train_acc 89.99% | test_acc 86.96%
+[Stage2/Head] Epoch 23/30 | loss 0.4638 | ce 0.4638 | logit 0.0000 | train_acc 90.19% | test_acc 86.92%
+[Stage2/Head] Epoch 24/30 | loss 0.4526 | ce 0.4526 | logit 0.0000 | train_acc 89.74% | test_acc 87.16%
+[Stage2/Head] Epoch 25/30 | loss 0.4312 | ce 0.4312 | logit 0.0000 | train_acc 90.20% | test_acc 87.32%
+[Stage2/Head] Epoch 26/30 | loss 0.4218 | ce 0.4218 | logit 0.0000 | train_acc 90.17% | test_acc 87.49%
+[Stage2/Head] Epoch 27/30 | loss 0.4050 | ce 0.4050 | logit 0.0000 | train_acc 90.19% | test_acc 87.63%
+[Stage2/Head] Epoch 28/30 | loss 0.3985 | ce 0.3985 | logit 0.0000 | train_acc 90.66% | test_acc 87.46%
+[Stage2/Head] Epoch 29/30 | loss 0.3837 | ce 0.3837 | logit 0.0000 | train_acc 91.14% | test_acc 88.25%
+[Stage2/Head] Epoch 30/30 | loss 0.3839 | ce 0.3839 | logit 0.0000 | train_acc 90.84% | test_acc 87.99%
+[Task 3] Training done in 1.62 min.
+[Task 3] Test (new data) -> ce_loss: 0.3056, acc: 95.53%, rec_loss: 14.2962
+[Task 3] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task3
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 84.28%
+  Task 1 [5]: 81.95%
+  Task 2 [6]: 90.19%
+  Task 3 [7]: 95.53%
+Mean over seen tasks (0..3): 87.99%
+[Task 3] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task3/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task3 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class0: 0.595159842215486"
+[1] 512  16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class1: 0.162393835529676"
+[1] 1024   16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class2: 0.63398080343603"
+[1] 1536   16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class3: 0.846845022038165"
+[1] 2048   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class4: 0.866095900588078"
+[1] 2560   16
+[1] "class 5 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 5 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class5: 1.53002606033782"
+[1] 3200   16
+[1] "class 6 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 6 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class6: 1.14262019758365"
+[1] 4000   16
+[1] "class 7 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 7 validation set sample size (indclude 50 samples from other classes): 650"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class7: 1.67327661430643"
+[1] 5000   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 8000"
+[1] "total test df size: 8000"
+ num [1:8000] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4    5    6    7 
+ 980 1135 1032 1010  982  892  958 1011 
+[1] "class 0 test data size:980"
+[1] "class 1 test data size:1135"
+[1] "class 2 test data size:1032"
+[1] "class 3 test data size:1010"
+[1] "class 4 test data size:982"
+[1] "class 5 test data size:892"
+[1] "class 6 test data size:958"
+[1] "class 7 test data size:1011"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.8295"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             881              79
+Predicted_Negative              99            6941
+[1] "Accuracy: 0.97775"
+[1] "Precision: 0.917708333333333"
+[1] "Recall for Class: 0.898979591836735"
+[1] "F1 Score for Class: 0.908247422680412"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive            1029              13
+Predicted_Negative             106            6852
+[1] "Accuracy: 0.985125"
+[1] "Precision: 0.987523992322457"
+[1] "Recall for Class: 0.906607929515418"
+[1] "F1 Score for Class: 0.945337620578778"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             718              42
+Predicted_Negative             314            6926
+[1] "Accuracy: 0.9555"
+[1] "Precision: 0.944736842105263"
+[1] "Recall for Class: 0.695736434108527"
+[1] "F1 Score for Class: 0.801339285714286"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             777             103
+Predicted_Negative             233            6887
+[1] "Accuracy: 0.958"
+[1] "Precision: 0.882954545454545"
+[1] "Recall for Class: 0.769306930693069"
+[1] "F1 Score for Class: 0.822222222222222"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             686              28
+Predicted_Negative             296            6990
+[1] "Accuracy: 0.9595"
+[1] "Precision: 0.96078431372549"
+[1] "Recall for Class: 0.69857433808554"
+[1] "F1 Score for Class: 0.808962264150943"
+[1] "Confusion Matrix for Class:5"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             698             147
+Predicted_Negative             194            6961
+[1] "Accuracy: 0.957375"
+[1] "Precision: 0.82603550295858"
+[1] "Recall for Class: 0.782511210762332"
+[1] "F1 Score for Class: 0.803684513529073"
+[1] "Confusion Matrix for Class:6"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             880             354
+Predicted_Negative              78            6688
+[1] "Accuracy: 0.946"
+[1] "Precision: 0.713128038897893"
+[1] "Recall for Class: 0.918580375782881"
+[1] "F1 Score for Class: 0.802919708029197"
+[1] "Confusion Matrix for Class:7"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             967             598
+Predicted_Negative              44            6391
+[1] "Accuracy: 0.91975"
+[1] "Precision: 0.617891373801917"
+[1] "Recall for Class: 0.956478733926805"
+[1] "F1 Score for Class: 0.750776397515528"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.684424989609627, 0.0104581963797644, -0.00615486411362709, -0.00681319521119654, 0.0193670991015203, 0.106345588088726, 0.0270634421219243, 0.011489561512252"
+[1] "sd: 0.211382418810067, 0.0349412718896963, 0.148187554921701, 0.0904688124851949, 0.0999872055695631, 0.15713878563872, 0.121844688994988, 0.048568477660249"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.000590557764737797, 0.67809686929778, 0.00357237103455482, 0.0105426718857971, 0.00376426431414848, 0.00362455934915061, 0.00524554015164501, 0.0125340131604181"
+[1] "sd: 0.00774503871461918, 0.23839187221577, 0.0157772954113848, 0.0343490583982945, 0.0230629136127608, 0.0115070538981988, 0.0277295601522183, 0.060296891021852"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: -0.00190132537185774, 0.00501565903826727, 0.477448874993077, 0.0367393903958608, 0.0373198100613707, -0.00435756682880957, 0.0127101071270234, 0.0278626792143264"
+[1] "sd: 0.022371602268597, 0.035452835543402, 0.276030007874426, 0.133402850998873, 0.0827750857267163, 0.0399203129635952, 0.0352099976402215, 0.0896031416334882"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: -0.0253310181759369, 0.0135480351733953, 0.0922405703617792, 0.612416596532306, -0.0511883141705289, -0.0326980023419699, -0.0117056130377956, 0.000653966813085939"
+[1] "sd: 0.0921041593177347, 0.0756144100035471, 0.207124749389834, 0.279738048755114, 0.105847347161071, 0.188296889522611, 0.0673386836967762, 0.0636392908287126"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.00066626161746878, -0.023326696812737, 0.010580919949985, -0.0173803576524665, 0.556476181400129, -0.00694026152093724, -1.4237657874007e-05, -0.0219627600012549"
+[1] "sd: 0.0222681113472794, 0.0673235080214968, 0.153232084655122, 0.104657979004201, 0.250849637242668, 0.102002741630791, 0.0868059954198568, 0.150645760666366"
+[1] "---------------------"
+[1] "GPc5 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.0548676280840174, 0.000552387814778561, 0.0469087635225971, 0.102535434386974, -0.00356995201180542, 0.575096454408609, 0.0388366567259511, 0.0272090411301294"
+[1] "sd: 0.136618736004098, 0.0302996679205303, 0.0838021231830575, 0.232723344515561, 0.124225738669038, 0.283798638012361, 0.150283159823794, 0.0662199858687466"
+[1] "---------------------"
+[1] "GPc6 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.0235864223164269, -0.0263599517964751, -0.00885554967839451, 0.0182468155290289, -0.00308415852743254, 0.0594889808146268, 0.762430280776499, 0.0104829580153584"
+[1] "sd: 0.24935508288183, 0.207063491791638, 0.258836458574836, 0.218315028062452, 0.231673148236978, 0.270103757566481, 0.233574022450464, 0.109636606290483"
+[1] "---------------------"
+[1] "GPc7 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7:"
+[1] "mean: 0.0439280429608052, 0.12682675900978, 0.0279280463746929, 0.106527780033265, 0.218835666978561, 0.181565409580259, 0.0508681122257242, 0.792566299708476"
+[1] "sd: 0.128931890512956, 0.145260493267069, 0.303308110363601, 0.200878255167391, 0.33280168711958, 0.216198131506119, 0.157380054852767, 0.160581208425847"
+[1] "---------------------"
+Warning messages:
+1: Removed 7 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+2: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+3: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+[1] "Save Results"
+null device 
+          1 
+[Task 3] Loaded from R CSV: 5000 rows, f_size=16
+[Task 3] Decoded images: torch.Size([5000, 1, 28, 28]) -> recovered dataset size 5000
+[Task 3] Augmenting Task 4 training set with 5000 recovered samples.
+[Task 3] Caching f_size features for feature-preservation in next task...
+[Task 3] Cached features: 48200 items.
+
+================================================================================
+Starting Task 4: digits [8]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.0191 | rec 0.0191 | feat 0.0000 | train_acc 55.91% | test_acc 70.56%
+[Stage1/AE] Epoch 2/30 | loss 0.0180 | rec 0.0180 | feat 0.0000 | train_acc 55.84% | test_acc 70.08%
+[Stage1/AE] Epoch 3/30 | loss 0.0175 | rec 0.0175 | feat 0.0000 | train_acc 55.58% | test_acc 69.91%
+[Stage1/AE] Epoch 4/30 | loss 0.0172 | rec 0.0172 | feat 0.0000 | train_acc 55.62% | test_acc 69.60%
+[Stage1/AE] Epoch 5/30 | loss 0.0170 | rec 0.0170 | feat 0.0000 | train_acc 55.36% | test_acc 69.51%
+[Stage1/AE] Epoch 6/30 | loss 0.0168 | rec 0.0168 | feat 0.0000 | train_acc 55.80% | test_acc 69.38%
+[Stage1/AE] Epoch 7/30 | loss 0.0167 | rec 0.0167 | feat 0.0000 | train_acc 55.42% | test_acc 69.17%
+[Stage1/AE] Epoch 8/30 | loss 0.0165 | rec 0.0165 | feat 0.0000 | train_acc 55.75% | test_acc 69.29%
+[Stage1/AE] Epoch 9/30 | loss 0.0164 | rec 0.0164 | feat 0.0000 | train_acc 55.58% | test_acc 69.14%
+[Stage1/AE] Epoch 10/30 | loss 0.0162 | rec 0.0162 | feat 0.0000 | train_acc 55.56% | test_acc 69.24%
+[Stage1/AE] Epoch 11/30 | loss 0.0161 | rec 0.0161 | feat 0.0000 | train_acc 55.71% | test_acc 69.08%
+[Stage1/AE] Epoch 12/30 | loss 0.0161 | rec 0.0161 | feat 0.0000 | train_acc 55.67% | test_acc 69.10%
+[Stage1/AE] Epoch 13/30 | loss 0.0160 | rec 0.0160 | feat 0.0000 | train_acc 55.61% | test_acc 69.13%
+[Stage1/AE] Epoch 14/30 | loss 0.0159 | rec 0.0159 | feat 0.0000 | train_acc 55.27% | test_acc 68.99%
+[Stage1/AE] Epoch 15/30 | loss 0.0157 | rec 0.0157 | feat 0.0000 | train_acc 55.64% | test_acc 69.14%
+[Stage1/AE] Epoch 16/30 | loss 0.0157 | rec 0.0157 | feat 0.0000 | train_acc 55.38% | test_acc 68.93%
+[Stage1/AE] Epoch 17/30 | loss 0.0157 | rec 0.0157 | feat 0.0000 | train_acc 55.66% | test_acc 68.95%
+[Stage1/AE] Epoch 18/30 | loss 0.0156 | rec 0.0156 | feat 0.0000 | train_acc 55.49% | test_acc 68.99%
+[Stage1/AE] Epoch 19/30 | loss 0.0156 | rec 0.0156 | feat 0.0000 | train_acc 55.58% | test_acc 68.97%
+[Stage1/AE] Epoch 20/30 | loss 0.0155 | rec 0.0155 | feat 0.0000 | train_acc 55.80% | test_acc 68.77%
+[Stage1/AE] Epoch 21/30 | loss 0.0154 | rec 0.0154 | feat 0.0000 | train_acc 55.67% | test_acc 68.91%
+[Stage1/AE] Epoch 22/30 | loss 0.0154 | rec 0.0154 | feat 0.0000 | train_acc 55.45% | test_acc 68.84%
+[Stage1/AE] Epoch 23/30 | loss 0.0154 | rec 0.0154 | feat 0.0000 | train_acc 55.31% | test_acc 68.97%
+[Stage1/AE] Epoch 24/30 | loss 0.0152 | rec 0.0152 | feat 0.0000 | train_acc 55.84% | test_acc 68.75%
+[Stage1/AE] Epoch 25/30 | loss 0.0153 | rec 0.0153 | feat 0.0000 | train_acc 55.77% | test_acc 68.78%
+[Stage1/AE] Epoch 26/30 | loss 0.0152 | rec 0.0152 | feat 0.0000 | train_acc 55.61% | test_acc 68.75%
+[Stage1/AE] Epoch 27/30 | loss 0.0151 | rec 0.0151 | feat 0.0000 | train_acc 55.44% | test_acc 68.89%
+[Stage1/AE] Epoch 28/30 | loss 0.0151 | rec 0.0151 | feat 0.0000 | train_acc 55.34% | test_acc 68.79%
+[Stage1/AE] Epoch 29/30 | loss 0.0151 | rec 0.0151 | feat 0.0000 | train_acc 55.36% | test_acc 68.73%
+[Stage1/AE] Epoch 30/30 | loss 0.0150 | rec 0.0150 | feat 0.0000 | train_acc 55.67% | test_acc 68.71%
+[Stage2/Head] Epoch 1/30 | loss 3.3434 | ce 3.3434 | logit 0.0000 | train_acc 52.76% | test_acc 60.30%
+[Stage2/Head] Epoch 2/30 | loss 2.9965 | ce 2.9965 | logit 0.0000 | train_acc 53.65% | test_acc 63.77%
+[Stage2/Head] Epoch 3/30 | loss 2.8209 | ce 2.8209 | logit 0.0000 | train_acc 54.67% | test_acc 65.83%
+[Stage2/Head] Epoch 4/30 | loss 2.7131 | ce 2.7131 | logit 0.0000 | train_acc 54.77% | test_acc 65.96%
+[Stage2/Head] Epoch 5/30 | loss 2.5995 | ce 2.5995 | logit 0.0000 | train_acc 54.76% | test_acc 66.01%
+[Stage2/Head] Epoch 6/30 | loss 2.4887 | ce 2.4887 | logit 0.0000 | train_acc 55.44% | test_acc 66.65%
+[Stage2/Head] Epoch 7/30 | loss 2.3991 | ce 2.3991 | logit 0.0000 | train_acc 54.99% | test_acc 66.83%
+[Stage2/Head] Epoch 8/30 | loss 2.3023 | ce 2.3023 | logit 0.0000 | train_acc 55.25% | test_acc 66.67%
+[Stage2/Head] Epoch 9/30 | loss 2.1998 | ce 2.1998 | logit 0.0000 | train_acc 55.40% | test_acc 67.57%
+[Stage2/Head] Epoch 10/30 | loss 2.0997 | ce 2.0997 | logit 0.0000 | train_acc 55.48% | test_acc 67.39%
+[Stage2/Head] Epoch 11/30 | loss 2.0157 | ce 2.0157 | logit 0.0000 | train_acc 55.65% | test_acc 67.63%
+[Stage2/Head] Epoch 12/30 | loss 1.9118 | ce 1.9118 | logit 0.0000 | train_acc 55.64% | test_acc 67.70%
+[Stage2/Head] Epoch 13/30 | loss 1.8191 | ce 1.8191 | logit 0.0000 | train_acc 55.50% | test_acc 68.55%
+[Stage2/Head] Epoch 14/30 | loss 1.7251 | ce 1.7251 | logit 0.0000 | train_acc 55.73% | test_acc 67.85%
+[Stage2/Head] Epoch 15/30 | loss 1.6419 | ce 1.6419 | logit 0.0000 | train_acc 55.58% | test_acc 68.26%
+[Stage2/Head] Epoch 16/30 | loss 1.5499 | ce 1.5499 | logit 0.0000 | train_acc 55.77% | test_acc 68.22%
+[Stage2/Head] Epoch 17/30 | loss 1.4608 | ce 1.4608 | logit 0.0000 | train_acc 55.79% | test_acc 68.14%
+[Stage2/Head] Epoch 18/30 | loss 1.3669 | ce 1.3669 | logit 0.0000 | train_acc 56.05% | test_acc 68.09%
+[Stage2/Head] Epoch 19/30 | loss 1.2883 | ce 1.2883 | logit 0.0000 | train_acc 56.20% | test_acc 68.59%
+[Stage2/Head] Epoch 20/30 | loss 1.2013 | ce 1.2013 | logit 0.0000 | train_acc 55.94% | test_acc 69.22%
+[Stage2/Head] Epoch 21/30 | loss 1.1334 | ce 1.1334 | logit 0.0000 | train_acc 56.09% | test_acc 69.06%
+[Stage2/Head] Epoch 22/30 | loss 1.0565 | ce 1.0565 | logit 0.0000 | train_acc 56.08% | test_acc 69.28%
+[Stage2/Head] Epoch 23/30 | loss 0.9840 | ce 0.9840 | logit 0.0000 | train_acc 56.39% | test_acc 69.30%
+[Stage2/Head] Epoch 24/30 | loss 0.9301 | ce 0.9301 | logit 0.0000 | train_acc 56.05% | test_acc 69.64%
+[Stage2/Head] Epoch 25/30 | loss 0.8578 | ce 0.8578 | logit 0.0000 | train_acc 56.30% | test_acc 70.00%
+[Stage2/Head] Epoch 26/30 | loss 0.8116 | ce 0.8116 | logit 0.0000 | train_acc 56.42% | test_acc 69.70%
+[Stage2/Head] Epoch 27/30 | loss 0.7509 | ce 0.7509 | logit 0.0000 | train_acc 80.44% | test_acc 87.59%
+[Stage2/Head] Epoch 28/30 | loss 0.7146 | ce 0.7146 | logit 0.0000 | train_acc 89.31% | test_acc 87.93%
+[Stage2/Head] Epoch 29/30 | loss 0.6663 | ce 0.6663 | logit 0.0000 | train_acc 90.01% | test_acc 88.02%
+[Stage2/Head] Epoch 30/30 | loss 0.6298 | ce 0.6298 | logit 0.0000 | train_acc 90.49% | test_acc 87.92%
+[Task 4] Training done in 1.79 min.
+[Task 4] Test (new data) -> ce_loss: 0.8915, acc: 93.74%, rec_loss: 22.1104
+[Task 4] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task4
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 79.22%
+  Task 1 [5]: 81.50%
+  Task 2 [6]: 93.11%
+  Task 3 [7]: 92.02%
+  Task 4 [8]: 93.74%
+Mean over seen tasks (0..4): 87.92%
+[Task 4] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task4/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task4 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class0: 0.539321700590883"
+[1] 409  16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class1: 0.14609946865632"
+[1] 818  16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class2: 0.308376472365216"
+[1] 1227   16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class3: 1.07646073791632"
+[1] 1636   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class4: 0.887617800205016"
+[1] 2045   16
+[1] "class 5 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 5 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class5: 0.805527961188809"
+[1] 2557   16
+[1] "class 6 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 6 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class6: 1.60513292793578"
+[1] 3197   16
+[1] "class 7 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 7 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class7: 1.02653867298431"
+[1] 3997   16
+[1] "class 8 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 8 validation set sample size (indclude 50 samples from other classes): 650"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class8: 1.20983458844542"
+[1] 4997   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 9000"
+[1] "n_ts is greater than the number of rows in the data frame, using all rows:8991"
+[1] "total test df size: 8991"
+ num [1:8991] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4    5    6    7    8 
+ 980 1135 1032 1010  982  892  958 1028  974 
+[1] "class 0 test data size:980"
+[1] "class 1 test data size:1135"
+[1] "class 2 test data size:1032"
+[1] "class 3 test data size:1010"
+[1] "class 4 test data size:982"
+[1] "class 5 test data size:892"
+[1] "class 6 test data size:958"
+[1] "class 7 test data size:1028"
+[1] "class 8 test data size:974"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.740851963074185"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             775              31
+Predicted_Negative             205            7980
+[1] "Accuracy: 0.973751529307085"
+[1] "Precision: 0.961538461538462"
+[1] "Recall for Class: 0.790816326530612"
+[1] "F1 Score for Class: 0.867861142217245"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             853               4
+Predicted_Negative             282            7852
+[1] "Accuracy: 0.968190412634857"
+[1] "Precision: 0.995332555425904"
+[1] "Recall for Class: 0.751541850220264"
+[1] "F1 Score for Class: 0.856425702811245"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             320              21
+Predicted_Negative             712            7938
+[1] "Accuracy: 0.918474029585141"
+[1] "Precision: 0.93841642228739"
+[1] "Recall for Class: 0.310077519379845"
+[1] "F1 Score for Class: 0.466132556445739"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             661              44
+Predicted_Negative             349            7937
+[1] "Accuracy: 0.95628962295629"
+[1] "Precision: 0.93758865248227"
+[1] "Recall for Class: 0.654455445544554"
+[1] "F1 Score for Class: 0.770845481049563"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             705              38
+Predicted_Negative             277            7971
+[1] "Accuracy: 0.964964964964965"
+[1] "Precision: 0.94885598923284"
+[1] "Recall for Class: 0.717922606924644"
+[1] "F1 Score for Class: 0.817391304347826"
+[1] "Confusion Matrix for Class:5"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             618              83
+Predicted_Negative             274            8016
+[1] "Accuracy: 0.960293626960294"
+[1] "Precision: 0.881597717546362"
+[1] "Recall for Class: 0.692825112107623"
+[1] "F1 Score for Class: 0.775894538606403"
+[1] "Confusion Matrix for Class:6"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             927             995
+Predicted_Negative              31            7038
+[1] "Accuracy: 0.885885885885886"
+[1] "Precision: 0.482310093652445"
+[1] "Recall for Class: 0.967640918580376"
+[1] "F1 Score for Class: 0.64375"
+[1] "Confusion Matrix for Class:7"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             962             250
+Predicted_Negative              66            7713
+[1] "Accuracy: 0.96485374263152"
+[1] "Precision: 0.793729372937294"
+[1] "Recall for Class: 0.93579766536965"
+[1] "F1 Score for Class: 0.858928571428571"
+[1] "Confusion Matrix for Class:8"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             840             864
+Predicted_Negative             134            7153
+[1] "Accuracy: 0.889000111222333"
+[1] "Precision: 0.492957746478873"
+[1] "Recall for Class: 0.862422997946612"
+[1] "F1 Score for Class: 0.627333831217326"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.566190360968863, 0.00197587530571936, 0.00842011606473861, 0.00549329496856615, -0.00912631467041131, -0.00627602817835495, 0.0371227925357231, 0.00311151180573029, 0.0055090042881327"
+[1] "sd: 0.242909069319701, 0.0125298054443971, 0.0748805209799891, 0.0770224844698554, 0.0572186328804854, 0.152828216991051, 0.107521443195716, 0.020106707448971, 0.0696314685839024"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.000108649943423133, 0.388118797997331, 0.00142457605947428, 0.00238663646021959, 0.000810253110086869, 0.00046884699862479, 0.000722142103333748, 0.00520533984346619, 0.0034415835622241"
+[1] "sd: 0.000654739053414194, 0.306546775441113, 0.00731810884633824, 0.0125680598687387, 0.00363698448521156, 0.00150887479289111, 0.00478440944928729, 0.0403165537625536, 0.00691876574279538"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.000133500188303683, 0.00401317148908307, 0.200803283504014, 0.00441674445926929, 0.0109089447004111, 0.000428883459401327, 0.00191279151118095, 0.0118780912368531, 0.00524318257971742"
+[1] "sd: 0.00225323069099395, 0.0114904427404124, 0.229064696508158, 0.0343367050737719, 0.0358872861155551, 0.00380560192902687, 0.00756388733358438, 0.0579692217903858, 0.0196890490830101"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.0105607366231647, 0.0152527882582797, 0.0173802318531043, 0.470487681278084, 0.0110243158555415, 0.0184566550307179, 0.011740893797682, -0.00842808447902771, 0.134625044496621"
+[1] "sd: 0.0437349145589762, 0.0400253915998938, 0.117253921054245, 0.281148792084565, 0.0376526435746954, 0.129945889766238, 0.0350132494026644, 0.0434070152323021, 0.111098134608255"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.00709962266471273, -0.00462237837558411, -0.0362251276727583, -0.018189643476509, 0.555871861889925, 0.00892074485308486, 0.0220517787250466, 0.00914786111479864, 0.0122461577255563"
+[1] "sd: 0.0241500464820518, 0.102763944519472, 0.20849204738029, 0.107592157216219, 0.264242182475498, 0.124066077843893, 0.0833322966486962, 0.167276203981613, 0.0528743789560068"
+[1] "---------------------"
+[1] "GPc5 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.0658882755201916, -0.00614768595847752, 0.000942039868832592, 0.0205406871238439, -0.00792065892931909, 0.493237905749237, 0.002763170844502, 0.0168798168418775, 0.0371189486858234"
+[1] "sd: 0.0971143267204827, 0.0237140854741681, 0.0416668395478334, 0.17424839443162, 0.063931542356071, 0.270854317180622, 0.0843900373535217, 0.050817958976815, 0.0997112925070101"
+[1] "---------------------"
+[1] "GPc6 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.187161469162838, 0.0303014123474802, 0.164634220968485, 0.165995012047675, 0.208672026720417, 0.112731691429841, 0.750415334587847, 0.0443253742639081, 0.134554031962476"
+[1] "sd: 0.246873611100658, 0.140515638103069, 0.229126491348382, 0.185755646826476, 0.219279791773738, 0.32700344899525, 0.155124372335444, 0.107049147804165, 0.1994526497624"
+[1] "---------------------"
+[1] "GPc7 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.0060730140408241, -0.0145350896859404, 0.050432462976565, 0.0503221545228696, 0.0317341545999358, 0.0620021681736277, 0.0148052934813771, 0.801698662678317, 0.0573732211135015"
+[1] "sd: 0.0472411429109461, 0.143105573111593, 0.155051519491634, 0.114335485944355, 0.305965902226475, 0.132413724087766, 0.0795984424625078, 0.213175010252656, 0.0809344981690753"
+[1] "---------------------"
+[1] "GPc8 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8:"
+[1] "mean: 0.0429725689323681, 0.00327522586348693, 0.115978448302747, 0.192194814780244, 0.133836495526341, 0.148326227652637, 0.0745391402021958, 0.0650317051080808, 0.422244827312504"
+[1] "sd: 0.0962907303663281, 0.18401590017806, 0.200563296537575, 0.163202042685137, 0.13420524115415, 0.156185957559136, 0.117261989847596, 0.124343020381171, 0.0498763114420751"
+[1] "---------------------"
+Warning messages:
+1: Removed 2 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+2: Removed 8 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+3: Removed 8 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+4: Removed 2 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+5: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+6: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+[1] "Save Results"
+null device 
+          1 
+[Task 4] Loaded from R CSV: 4997 rows, f_size=16
+[Task 4] Decoded images: torch.Size([4997, 1, 28, 28]) -> recovered dataset size 4997
+[Task 4] Augmenting Task 5 training set with 4997 recovered samples.
+[Task 4] Caching f_size features for feature-preservation in next task...
+[Task 4] Cached features: 54051 items.
+
+================================================================================
+Starting Task 5: digits [9]
+================================================================================
+[Stage1/AE] Epoch 1/30 | loss 0.0135 | rec 0.0135 | feat 0.0000 | train_acc 56.43% | test_acc 73.65%
+[Stage1/AE] Epoch 2/30 | loss 0.0128 | rec 0.0128 | feat 0.0000 | train_acc 56.63% | test_acc 73.59%
+[Stage1/AE] Epoch 3/30 | loss 0.0125 | rec 0.0125 | feat 0.0000 | train_acc 56.52% | test_acc 73.49%
+[Stage1/AE] Epoch 4/30 | loss 0.0123 | rec 0.0123 | feat 0.0000 | train_acc 56.41% | test_acc 73.48%
+[Stage1/AE] Epoch 5/30 | loss 0.0121 | rec 0.0121 | feat 0.0000 | train_acc 56.30% | test_acc 73.21%
+[Stage1/AE] Epoch 6/30 | loss 0.0120 | rec 0.0120 | feat 0.0000 | train_acc 56.40% | test_acc 73.10%
+[Stage1/AE] Epoch 7/30 | loss 0.0119 | rec 0.0119 | feat 0.0000 | train_acc 56.33% | test_acc 72.97%
+[Stage1/AE] Epoch 8/30 | loss 0.0119 | rec 0.0119 | feat 0.0000 | train_acc 56.22% | test_acc 72.93%
+[Stage1/AE] Epoch 9/30 | loss 0.0118 | rec 0.0118 | feat 0.0000 | train_acc 56.07% | test_acc 73.10%
+[Stage1/AE] Epoch 10/30 | loss 0.0117 | rec 0.0117 | feat 0.0000 | train_acc 56.16% | test_acc 73.07%
+[Stage1/AE] Epoch 11/30 | loss 0.0116 | rec 0.0116 | feat 0.0000 | train_acc 55.98% | test_acc 72.97%
+[Stage1/AE] Epoch 12/30 | loss 0.0115 | rec 0.0115 | feat 0.0000 | train_acc 56.33% | test_acc 72.77%
+[Stage1/AE] Epoch 13/30 | loss 0.0115 | rec 0.0115 | feat 0.0000 | train_acc 55.88% | test_acc 72.81%
+[Stage1/AE] Epoch 14/30 | loss 0.0113 | rec 0.0113 | feat 0.0000 | train_acc 56.36% | test_acc 72.82%
+[Stage1/AE] Epoch 15/30 | loss 0.0114 | rec 0.0114 | feat 0.0000 | train_acc 55.87% | test_acc 72.86%
+[Stage1/AE] Epoch 16/30 | loss 0.0113 | rec 0.0113 | feat 0.0000 | train_acc 55.95% | test_acc 72.75%
+[Stage1/AE] Epoch 17/30 | loss 0.0112 | rec 0.0112 | feat 0.0000 | train_acc 56.02% | test_acc 72.77%
+[Stage1/AE] Epoch 18/30 | loss 0.0112 | rec 0.0112 | feat 0.0000 | train_acc 56.15% | test_acc 72.78%
+[Stage1/AE] Epoch 19/30 | loss 0.0112 | rec 0.0112 | feat 0.0000 | train_acc 56.37% | test_acc 72.90%
+[Stage1/AE] Epoch 20/30 | loss 0.0111 | rec 0.0111 | feat 0.0000 | train_acc 55.91% | test_acc 72.80%
+[Stage1/AE] Epoch 21/30 | loss 0.0111 | rec 0.0111 | feat 0.0000 | train_acc 56.05% | test_acc 72.76%
+[Stage1/AE] Epoch 22/30 | loss 0.0111 | rec 0.0111 | feat 0.0000 | train_acc 55.83% | test_acc 72.74%
+[Stage1/AE] Epoch 23/30 | loss 0.0110 | rec 0.0110 | feat 0.0000 | train_acc 56.31% | test_acc 72.77%
+[Stage1/AE] Epoch 24/30 | loss 0.0110 | rec 0.0110 | feat 0.0000 | train_acc 55.97% | test_acc 72.74%
+[Stage1/AE] Epoch 25/30 | loss 0.0109 | rec 0.0109 | feat 0.0000 | train_acc 55.98% | test_acc 72.67%
+[Stage1/AE] Epoch 26/30 | loss 0.0110 | rec 0.0110 | feat 0.0000 | train_acc 56.02% | test_acc 72.82%
+[Stage1/AE] Epoch 27/30 | loss 0.0109 | rec 0.0109 | feat 0.0000 | train_acc 55.97% | test_acc 72.65%
+[Stage1/AE] Epoch 28/30 | loss 0.0108 | rec 0.0108 | feat 0.0000 | train_acc 55.92% | test_acc 72.76%
+[Stage1/AE] Epoch 29/30 | loss 0.0109 | rec 0.0109 | feat 0.0000 | train_acc 56.01% | test_acc 72.64%
+[Stage1/AE] Epoch 30/30 | loss 0.0108 | rec 0.0108 | feat 0.0000 | train_acc 55.87% | test_acc 72.64%
+[Stage2/Head] Epoch 1/30 | loss 3.4321 | ce 3.4321 | logit 0.0000 | train_acc 54.03% | test_acc 66.62%
+[Stage2/Head] Epoch 2/30 | loss 3.2421 | ce 3.2421 | logit 0.0000 | train_acc 54.00% | test_acc 67.48%
+[Stage2/Head] Epoch 3/30 | loss 3.1060 | ce 3.1060 | logit 0.0000 | train_acc 54.31% | test_acc 67.23%
+[Stage2/Head] Epoch 4/30 | loss 2.9992 | ce 2.9992 | logit 0.0000 | train_acc 54.47% | test_acc 67.51%
+[Stage2/Head] Epoch 5/30 | loss 2.9181 | ce 2.9181 | logit 0.0000 | train_acc 54.63% | test_acc 67.67%
+[Stage2/Head] Epoch 6/30 | loss 2.8072 | ce 2.8072 | logit 0.0000 | train_acc 54.87% | test_acc 68.42%
+[Stage2/Head] Epoch 7/30 | loss 2.7180 | ce 2.7180 | logit 0.0000 | train_acc 54.77% | test_acc 68.57%
+[Stage2/Head] Epoch 8/30 | loss 2.6188 | ce 2.6188 | logit 0.0000 | train_acc 55.00% | test_acc 68.40%
+[Stage2/Head] Epoch 9/30 | loss 2.5335 | ce 2.5335 | logit 0.0000 | train_acc 54.72% | test_acc 69.16%
+[Stage2/Head] Epoch 10/30 | loss 2.4377 | ce 2.4377 | logit 0.0000 | train_acc 55.05% | test_acc 68.54%
+[Stage2/Head] Epoch 11/30 | loss 2.3394 | ce 2.3394 | logit 0.0000 | train_acc 55.38% | test_acc 68.13%
+[Stage2/Head] Epoch 12/30 | loss 2.2503 | ce 2.2503 | logit 0.0000 | train_acc 55.08% | test_acc 68.81%
+[Stage2/Head] Epoch 13/30 | loss 2.1670 | ce 2.1670 | logit 0.0000 | train_acc 55.02% | test_acc 68.86%
+[Stage2/Head] Epoch 14/30 | loss 2.0670 | ce 2.0670 | logit 0.0000 | train_acc 55.42% | test_acc 68.23%
+[Stage2/Head] Epoch 15/30 | loss 1.9641 | ce 1.9641 | logit 0.0000 | train_acc 55.56% | test_acc 68.74%
+[Stage2/Head] Epoch 16/30 | loss 1.8742 | ce 1.8742 | logit 0.0000 | train_acc 55.43% | test_acc 68.47%
+[Stage2/Head] Epoch 17/30 | loss 1.7861 | ce 1.7861 | logit 0.0000 | train_acc 55.51% | test_acc 69.59%
+[Stage2/Head] Epoch 18/30 | loss 1.7125 | ce 1.7125 | logit 0.0000 | train_acc 54.95% | test_acc 69.59%
+[Stage2/Head] Epoch 19/30 | loss 1.6111 | ce 1.6111 | logit 0.0000 | train_acc 55.51% | test_acc 70.55%
+[Stage2/Head] Epoch 20/30 | loss 1.4937 | ce 1.4937 | logit 0.0000 | train_acc 55.72% | test_acc 70.84%
+[Stage2/Head] Epoch 21/30 | loss 1.3514 | ce 1.3514 | logit 0.0000 | train_acc 55.65% | test_acc 71.19%
+[Stage2/Head] Epoch 22/30 | loss 1.2235 | ce 1.2235 | logit 0.0000 | train_acc 55.85% | test_acc 71.15%
+[Stage2/Head] Epoch 23/30 | loss 1.1052 | ce 1.1052 | logit 0.0000 | train_acc 55.87% | test_acc 71.15%
+[Stage2/Head] Epoch 24/30 | loss 1.0135 | ce 1.0135 | logit 0.0000 | train_acc 55.73% | test_acc 71.43%
+[Stage2/Head] Epoch 25/30 | loss 0.9240 | ce 0.9240 | logit 0.0000 | train_acc 66.46% | test_acc 82.48%
+[Stage2/Head] Epoch 26/30 | loss 0.8409 | ce 0.8409 | logit 0.0000 | train_acc 83.63% | test_acc 84.83%
+[Stage2/Head] Epoch 27/30 | loss 0.7795 | ce 0.7795 | logit 0.0000 | train_acc 88.00% | test_acc 83.63%
+[Stage2/Head] Epoch 28/30 | loss 0.7223 | ce 0.7223 | logit 0.0000 | train_acc 88.23% | test_acc 83.45%
+[Stage2/Head] Epoch 29/30 | loss 0.6755 | ce 0.6755 | logit 0.0000 | train_acc 88.86% | test_acc 83.54%
+[Stage2/Head] Epoch 30/30 | loss 0.6380 | ce 0.6380 | logit 0.0000 | train_acc 88.43% | test_acc 82.83%
+[Task 5] Training done in 1.82 min.
+[Task 5] Test (new data) -> ce_loss: 0.6563, acc: 96.04%, rec_loss: 13.0559
+[Task 5] Wrote CSVs to: ./runs_mnist_continual/run_20260114_161757/task5
+Accuracies on seen tasks:
+  Task 0 [0,1,2,3,4]: 67.97%
+  Task 1 [5]: 79.60%
+  Task 2 [6]: 89.56%
+  Task 3 [7]: 76.95%
+  Task 4 [8]: 86.86%
+  Task 5 [9]: 96.04%
+Mean over seen tasks (0..5): 82.83%
+[Task 5] Running Rscript to produce: ./runs_mnist_continual/run_20260114_161757/task5/inducing_points.csv
+Loading required package: Matrix
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+This is gplite version 0.13.0
+Directory already exists: ./runs_mnist_continual/run_20260114_161757/task5 
+[1] "Using original Y values (no log-space transform)"
+[1] "class 0 training sample size (indclude 50 samples from other classes): 377"
+[1] "class 0 validation set sample size (indclude 50 samples from other classes): 132"
+[1] "Using laGP package for training"
+[1] "Selecting 327 inducing points"
+[1] "validation MSE for class0: 0.498838035199755"
+[1] 327  16
+[1] "class 1 training sample size (indclude 50 samples from other classes): 377"
+[1] "class 1 validation set sample size (indclude 50 samples from other classes): 132"
+[1] "Using laGP package for training"
+[1] "Selecting 327 inducing points"
+[1] "validation MSE for class1: 0.0922601971624786"
+[1] 654  16
+[1] "class 2 training sample size (indclude 50 samples from other classes): 377"
+[1] "class 2 validation set sample size (indclude 50 samples from other classes): 132"
+[1] "Using laGP package for training"
+[1] "Selecting 327 inducing points"
+[1] "validation MSE for class2: 1.32999566737538"
+[1] 981  16
+[1] "class 3 training sample size (indclude 50 samples from other classes): 377"
+[1] "class 3 validation set sample size (indclude 50 samples from other classes): 132"
+[1] "Using laGP package for training"
+[1] "Selecting 327 inducing points"
+[1] "validation MSE for class3: 0.727476937917851"
+[1] 1308   16
+[1] "class 4 training sample size (indclude 50 samples from other classes): 377"
+[1] "class 4 validation set sample size (indclude 50 samples from other classes): 132"
+[1] "Using laGP package for training"
+[1] "Selecting 327 inducing points"
+[1] "validation MSE for class4: 0.262834375779164"
+[1] 1635   16
+[1] "class 5 training sample size (indclude 50 samples from other classes): 459"
+[1] "class 5 validation set sample size (indclude 50 samples from other classes): 153"
+[1] "Using laGP package for training"
+[1] "Selecting 409 inducing points"
+[1] "validation MSE for class5: 0.816976400907268"
+[1] 2044   16
+[1] "class 6 training sample size (indclude 50 samples from other classes): 562"
+[1] "class 6 validation set sample size (indclude 50 samples from other classes): 178"
+[1] "Using laGP package for training"
+[1] "Selecting 512 inducing points"
+[1] "validation MSE for class6: 1.0192179238174"
+[1] 2556   16
+[1] "class 7 training sample size (indclude 50 samples from other classes): 690"
+[1] "class 7 validation set sample size (indclude 50 samples from other classes): 210"
+[1] "Using laGP package for training"
+[1] "Selecting 640 inducing points"
+[1] "validation MSE for class7: 0.832136846019347"
+[1] 3196   16
+[1] "class 8 training sample size (indclude 50 samples from other classes): 850"
+[1] "class 8 validation set sample size (indclude 50 samples from other classes): 250"
+[1] "Using laGP package for training"
+[1] "Selecting 800 inducing points"
+[1] "validation MSE for class8: 0.770374383148438"
+[1] 3996   16
+[1] "class 9 training sample size (indclude 50 samples from other classes): 2050"
+[1] "class 9 validation set sample size (indclude 50 samples from other classes): 650"
+[1] "Using laGP package for training"
+[1] "Selecting 1000 inducing points"
+[1] "validation MSE for class9: 1.29148749570044"
+[1] 4996   16
+[1] "Train Finished"
+[1] "---------------------"
+[1] "Inducing Points Saved"
+[1] "---------------------"
+[1] "Expected testing data total: 10000"
+[1] "total test df size: 10000"
+ num [1:10000] 2 1 0 4 1 4 0 0 1 3 ...
+
+   0    1    2    3    4    5    6    7    8    9 
+ 980 1135 1032 1010  982  892  958 1028  974 1009 
+[1] "class 0 test data size:980"
+[1] "class 1 test data size:1135"
+[1] "class 2 test data size:1032"
+[1] "class 3 test data size:1010"
+[1] "class 4 test data size:982"
+[1] "class 5 test data size:892"
+[1] "class 6 test data size:958"
+[1] "class 7 test data size:1028"
+[1] "class 8 test data size:974"
+[1] "class 9 test data size:1009"
+[1] "Testset GPs:"
+[1] "Total accuracy: 0.7048"
+[1] "Confusion Matrix for Class:0"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             795              42
+Predicted_Negative             185            8978
+[1] "Accuracy: 0.9773"
+[1] "Precision: 0.949820788530466"
+[1] "Recall for Class: 0.811224489795918"
+[1] "F1 Score for Class: 0.875068794716566"
+[1] "Confusion Matrix for Class:1"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             914               9
+Predicted_Negative             221            8856
+[1] "Accuracy: 0.977"
+[1] "Precision: 0.990249187432286"
+[1] "Recall for Class: 0.805286343612335"
+[1] "F1 Score for Class: 0.88824101068999"
+[1] "Confusion Matrix for Class:2"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             553              39
+Predicted_Negative             479            8929
+[1] "Accuracy: 0.9482"
+[1] "Precision: 0.934121621621622"
+[1] "Recall for Class: 0.535852713178295"
+[1] "F1 Score for Class: 0.681034482758621"
+[1] "Confusion Matrix for Class:3"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             669              82
+Predicted_Negative             341            8908
+[1] "Accuracy: 0.9577"
+[1] "Precision: 0.890812250332889"
+[1] "Recall for Class: 0.662376237623762"
+[1] "F1 Score for Class: 0.759795570698467"
+[1] "Confusion Matrix for Class:4"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             133              11
+Predicted_Negative             849            9007
+[1] "Accuracy: 0.914"
+[1] "Precision: 0.923611111111111"
+[1] "Recall for Class: 0.135437881873727"
+[1] "F1 Score for Class: 0.236234458259325"
+[1] "Confusion Matrix for Class:5"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             551              91
+Predicted_Negative             341            9017
+[1] "Accuracy: 0.9568"
+[1] "Precision: 0.858255451713396"
+[1] "Recall for Class: 0.617713004484305"
+[1] "F1 Score for Class: 0.718383311603651"
+[1] "Confusion Matrix for Class:6"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             895             508
+Predicted_Negative              63            8534
+[1] "Accuracy: 0.9429"
+[1] "Precision: 0.63791874554526"
+[1] "Recall for Class: 0.934237995824635"
+[1] "F1 Score for Class: 0.758153324862346"
+[1] "Confusion Matrix for Class:7"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             779             107
+Predicted_Negative             249            8865
+[1] "Accuracy: 0.9644"
+[1] "Precision: 0.879232505643341"
+[1] "Recall for Class: 0.757782101167315"
+[1] "F1 Score for Class: 0.814002089864159"
+[1] "Confusion Matrix for Class:8"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             786             332
+Predicted_Negative             188            8694
+[1] "Accuracy: 0.948"
+[1] "Precision: 0.70304114490161"
+[1] "Recall for Class: 0.806981519507187"
+[1] "F1 Score for Class: 0.751434034416826"
+[1] "Confusion Matrix for Class:9"
+                   Actual_Positive Actual_Negative
+Predicted_Positive             973            1731
+Predicted_Negative              36            7260
+[1] "Accuracy: 0.8233"
+[1] "Precision: 0.359837278106509"
+[1] "Recall for Class: 0.964321110009911"
+[1] "F1 Score for Class: 0.524104497710746"
+[1] "GPc0 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.611041608266788, -0.00103139815480768, 0.0135452265521681, 0.0017751686586056, 0.0210307865992217, 0.00798847921067812, 0.0611107919214269, 0.0118051498294959, 0.0280614890169886, 0.0330760582372679"
+[1] "sd: 0.23955650433572, 0.0101302416120356, 0.0640920144865272, 0.0613268055617666, 0.054514075704256, 0.111796280585932, 0.110917813693932, 0.0375575982160332, 0.0650157700117962, 0.0505294577528032"
+[1] "---------------------"
+[1] "GPc1 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 2.77882629016684e-05, 0.514560353985766, 0.00253053086553307, 0.0021396923102051, 0.00177463527340263, 0.000543090914313886, 0.00114355025522417, 0.00690534087856822, 0.00231122269662392, 0.00199937404840975"
+[1] "sd: 0.00043214435543565, 0.310757339428653, 0.0127797042372664, 0.0132684609851362, 0.00587421240778891, 0.00377494664441795, 0.00928100168847463, 0.0491487748653845, 0.0132815095739071, 0.0177275378319799"
+[1] "---------------------"
+[1] "GPc2 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.00311983023426677, 0.00870290771215637, 0.341145322051595, -0.0543727185503408, 0.013697342437582, -0.00300054436690897, 0.0122389210763818, 0.0131519452684295, -0.00305320910393809, 0.000969350128633766"
+[1] "sd: 0.0166052081253219, 0.0302218254642774, 0.285066117090348, 0.152252300396508, 0.0603912337847097, 0.0291461310983711, 0.0356602529213396, 0.0772993906715634, 0.0894059335761698, 0.0189988263503213"
+[1] "---------------------"
+[1] "GPc3 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.00199659330504447, 0.012735777674376, 0.0538299859579377, 0.457969097613574, 0.0108370891551766, 0.0363678766553002, 3.84539314839263e-05, 0.00542138796744444, 0.0421264883096406, 0.00937913933809351"
+[1] "sd: 0.0172459879166052, 0.0360594542697554, 0.154921189315093, 0.302753981900443, 0.0104742691091655, 0.0878684618118108, 0.0264457753555643, 0.0252838861196537, 0.0921290594983052, 0.0214307569620038"
+[1] "---------------------"
+[1] "GPc4 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.000627970661819976, 0.00213889435094281, 0.0105989459844949, 0.0010740076950632, 0.0978946812342148, 0.00338275000442143, 0.00977135977559809, 0.00189511722388192, 0.00387971571185968, 0.00835377133996248"
+[1] "sd: 0.00612961466948818, 0.00627340434199084, 0.0646810104577515, 0.00928276161291135, 0.154594427366095, 0.0249456130974699, 0.0356272795601328, 0.0205708817145802, 0.020372088461596, 0.0441154182695187"
+[1] "---------------------"
+[1] "GPc5 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.0511414310273552, 0.000843287718665451, 0.00158536536689201, 0.0657718430203042, 0.0131233189088192, 0.418580115720944, 0.0190025936149766, 0.00588612690789495, 0.0628782330856256, 0.0265329474883982"
+[1] "sd: 0.0869216500115499, 0.00896186483353318, 0.0481952389546277, 0.140451337978426, 0.0384572072429228, 0.253478246356545, 0.0802416622535288, 0.032880335170768, 0.102308231322979, 0.0532114219668285"
+[1] "---------------------"
+[1] "GPc6 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.187215738809808, -0.00165894589847247, 0.167805097740046, 0.0696009055733946, 0.0262008747159091, 0.143497490519261, 0.641602720078155, 0.0112744427599428, 0.057893112063215, 0.0240643308098572"
+[1] "sd: 0.235145675217316, 0.0866737265099224, 0.208396507321967, 0.186858801648958, 0.157561597239244, 0.254328430263452, 0.216011970208183, 0.0722452795708109, 0.223921668739869, 0.0764325543440287"
+[1] "---------------------"
+[1] "GPc7 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.0246300088600294, 0.0404217521031965, 0.032032475047982, 0.0180647526965823, 0.122367679384683, 0.0692807410960026, 0.0285450615288793, 0.573983189190441, 0.0180079596143422, 0.114180997437075"
+[1] "sd: 0.0483869333987407, 0.124158389907742, 0.104581237666973, 0.0780876623190663, 0.122416626213126, 0.117351389850163, 0.0688411552141625, 0.282566581551004, 0.0823233390232408, 0.106692974161046"
+[1] "---------------------"
+[1] "GPc8 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.0339972985193964, 0.0210029826893083, 0.111221560649338, 0.0924389261485668, 0.0743064723383455, 0.127897093005529, 0.093411545496322, 0.0428725098739565, 0.417828502246976, 0.0845691638044939"
+[1] "sd: 0.0802540137409529, 0.0669901456098909, 0.126151537255803, 0.177445215056125, 0.0477354230748951, 0.113558862289031, 0.0881225779131122, 0.0535525886009936, 0.107307092042541, 0.0464798464639403"
+[1] "---------------------"
+[1] "GPc9 distribution statistics for0, 1, 2, 3, 4, 5, 6, 7, 8, 9:"
+[1] "mean: 0.0474291233281971, 0.108444976860677, 0.136905407634867, 0.140918282322194, 0.425038440272881, 0.201028426130943, 0.14316234066927, 0.235351240753459, 0.17669053433893, 0.529452105190063"
+[1] "sd: 0.112204887142749, 0.135039416707483, 0.119927598779449, 0.144395150160161, 0.152456378749661, 0.173642539600388, 0.113620237646703, 0.170365570778743, 0.124138485065478, 0.0657830087013485"
+[1] "---------------------"
+Warning messages:
+1: Removed 2 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+2: Removed 9 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+3: Removed 3 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+4: Removed 4 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+5: Removed 9 rows containing missing values or values outside the scale range
+(`geom_bar()`). 
+6: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+7: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+8: Removed 1 row containing missing values or values outside the scale range
+(`geom_bar()`). 
+[1] "Save Results"
+null device 
+          1 
+
+All tasks complete.
+Run directory: ./runs_mnist_continual/run_20260114_161757
+CSV metrics:   ./runs_mnist_continual/run_20260114_161757/metrics.csv
+GP training files:    ./runs_mnist_continual/run_20260114_161757/gp_data
+test per epoch
+test per epoch
+test per epoch
+test per epoch
+test per epoch
+test per epoch

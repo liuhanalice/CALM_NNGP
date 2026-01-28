@@ -102,12 +102,15 @@ if (is_test) {
   } else {
     print("Using original Y values (no log-space transform)")
   }
+  print(paste0("Using GP package: ", GP_package))
+  print("======================================")
 
   # Init inducing points and labels matrices
   inducing_points <- matrix(NA, nrow = 0, ncol = f)
   inducing_points_GTlabels <- matrix(NA, nrow = 0, ncol = 1)
 
   # Train GP models for each existing class
+  print("---- Start Training GPs for existing classes ----")
   for (j in seq_along(existingclass_set)) { # j = 1,2,3,4, ...
     label <- existingclass_set[[j]] # label = 0,1,2,3, ...
     key <- paste0("c", label)
@@ -136,12 +139,10 @@ if (is_test) {
     ### train_GP: bind target class and other classes ###
     # GPj <- train_GP(X=X, Y=Y, val.X=val.X, val.Y=val.Y, label=label, use_inducing = TRUE, num_inducing = num_inducing)
     if (GP_package == 'gplite') {
-      print("Using gplite package for GP training")
       GPj <- train_GP_v3(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + j), drop = FALSE],
                         val.X=val.X, val.Y=val.Y,
                         label=label, use_inducing = TRUE, num_inducing = num_inducing)
     } else if (GP_package == 'laGP') {
-      print("Using laGP package for training")
       GPj <- train_GP_laGP(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + j), drop = FALSE],
                         val.X=val.X, val.Y=val.Y,
                         label=label, use_inducing = TRUE, num_inducing = num_inducing)
@@ -154,7 +155,7 @@ if (is_test) {
     # assuming inducing points are all from the same class j [original points as inducing points]
     inducing_points_GTlabels <- rbind(inducing_points_GTlabels, matrix(label, nrow = nrow(GPj$inducing_points), ncol = 1)) 
 
-    print(dim(inducing_points))
+    print(paste0("Current inducing_points dim: ", dim(inducing_points)[1], " x ", dim(inducing_points)[2]))
     print(GPj$plot)
     gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
   }
@@ -188,11 +189,12 @@ str(test.df$label)
 table(test.df$label)
 test.df$label <- as.numeric(as.character(test.df$label))
 for (j in seq_along(existingclass_set)) {
-  label <- j - 1
+  # label <- j - 1
+  label <- existingclass_set[[j]]
   key <- paste0("c", label)
   test_df <- test.df[test.df$label == label, ]
   test_data_X[[key]] <- as.matrix(test_df[, 1:f])
-  test_data_Y[[key]] <- matrix(test_df[, (f + j)])
+  test_data_Y[[key]] <- as.matrix(test_df[, (f + label + 1), drop = FALSE])
   test_data_label[[key]] <- matrix(label, nrow = nrow(test_data_X[[key]]), ncol=1)
   print(paste0("class ", label, " test data size:", nrow(test_df)))
 }

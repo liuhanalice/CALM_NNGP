@@ -343,19 +343,26 @@ test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp
 
     if (gp_package == 'gplite') {
       out.test <- gp_pred(GPmodels[[key]], test_data, jitter = 1e-4)
+      m <- out.test$mean
+      if(is.null(m)){
+        stop(paste0("gplite prediction failed for class ", label))
+      }
+      GP_test_mean_mat[, j] <- as.numeric(m)
+
     } else if (gp_package == 'laGP') {
       out.test <- predGPsep(GPmodels[[key]], test_data)
+      m <- out.test$mean
+      if(is.null(m)){
+        stop(paste0("laGP prediction failed for class ", label))
+      }
+      GP_test_mean_mat[, j] <- as.numeric(m)
     } else {
       stop("Unsupported GP package. Use 'gplite' or 'laGP'.")
     }
-
-    GP_test_mean_mat[, j] <- out.test$mean
   }
   colnames(GP_test_mean_mat) <- paste0("c", GPs)
 
-  predicted_classes <- sapply(1:nrow(GP_test_mean_mat), function(i) {
-    which.max(GP_test_mean_mat[i, ]) - 1
-  })
+  predicted_classes <- apply(GP_test_mean_mat, 1, function(row) GPs[[which.max(row)]])
   predicted_classes <- as.numeric(predicted_classes)
   true_labels <- as.numeric(test_data_label[, 1])
 
@@ -384,10 +391,16 @@ test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp
       row.names = c("Predicted_Positive", "Predicted_Negative")
     ))
 
-    print(paste0("Accuracy: ", (TP + TN) / (TP + FP + TN + FN)))
-    print(paste0("Precision: ", TP / (TP + FP)))
-    print(paste0("Recall for Class: ", TP / (TP + FN)))
-    print(paste0("F1 Score for Class: ", 2 * TP / (2 * TP + FP + FN)))
+    accuracy  <- (TP + TN) / (TP + FP + TN + FN)
+    precision <- if ((TP + FP) == 0) NA_real_ else TP / (TP + FP)
+    recall    <- if ((TP + FN) == 0) NA_real_ else TP / (TP + FN)
+    f1        <- if (is.na(precision) || is.na(recall) || (precision + recall) == 0) NA_real_
+                else 2 * precision * recall / (precision + recall)
+
+    print(paste0("Accuracy: ", accuracy))
+    print(paste0("Precision: ", precision))
+    print(paste0("Recall for Class: ", recall))
+    print(paste0("F1 Score for Class: ", f1))
   }
 
   GP_test_mean_mat_with_label <- cbind(GP_test_mean_mat, label = test_data_label[, 1])

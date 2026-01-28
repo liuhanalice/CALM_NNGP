@@ -308,7 +308,7 @@ def run_rscript_and_wait(rscript_path, r_args_str=None, cwd=None, r_cmd=None):
                 # Not found — ask user to supply r_cmd explicitly
                 raise FileNotFoundError(
                     "Rscript not found on PATH. On Windows, pass r_cmd with the full path to Rscript.exe, "
-                    "e.g., r_cmd=r'C:\\Program Files\\R\\R-4.3.1\\bin\\Rscript.exe'."
+                    "e.g., r_cmd=r'C:\\Program Files\\R\\R-4.5.1\\bin\\Rscript.exe'."
                 )
         else:
             # macOS/Linux default
@@ -537,6 +537,7 @@ def main():
     for t, tr_loader in enumerate(train_loaders):
         print("\n" + "="*80)
         print(f"Starting Task {t}: digits {tasks[t]}")
+        print(f"Training samples size: {len(tr_loader.dataset)}")
         print("="*80)
 
         # Freeze head for tasks after 0
@@ -815,7 +816,7 @@ def main():
         histories_per_task=head_histories_per_task,
         epochs_per_task=epochs_head_per_task,
         per_epoch_test_acc_available=("test_acc" in head_histories_per_task[0]),
-        test_end_accs=test_end_accs,  # or your list if you have it
+        test_end_accs=test_end_accs,
         title="MNIST Continual: Head-Only Accuracy vs Global Epochs",
         save_path=os.path.join(run_dir, "acc_over_time_head_only.png")
     )

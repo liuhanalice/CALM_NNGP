@@ -100,6 +100,7 @@ def _save_df(arr2d, path, col_names):
     df = pd.DataFrame(arr2d, columns=col_names)
     df.to_csv(path, index=False)  # no index column
 
+
 @torch.no_grad()
 def _collect_feats_logits_labels(model, loader, device, apply_softmax=True):
     model.eval()
@@ -117,27 +118,73 @@ def _collect_feats_logits_labels(model, loader, device, apply_softmax=True):
     labels = torch.cat(labels, dim=0).numpy().reshape(-1, 1)
     return feats, logits, labels
 
-@torch.no_grad()
-def export_task_csvs(model, train_loader, list_test_loader, device, out_dir, f_size, num_classes=10):
+
+def _filter_top_fraction_per_class(scores: np.ndarray,
+                                   labels: np.ndarray,
+                                   keep_frac: float,
+                                   num_classes: int) -> np.ndarray:
     """
+    Keep top keep_frac rows per TRUE class based on scores[:, true_class].
+    Returns boolean mask length N.
+    """
+    y = labels.reshape(-1).astype(int)
+    N = y.shape[0]
+    mask = np.zeros(N, dtype=bool)
+
+    for c in range(num_classes):
+        idx = np.where(y == c)[0]
+        if idx.size == 0:
+            continue
+        conf = scores[idx, c]                 # score of the TRUE class
+        order = np.argsort(conf)[::-1]        # descending
+        k = int(np.ceil(idx.size * keep_frac))
+        k = max(1, k)                         # keep at least 1 if class exists
+        keep_idx = idx[order[:k]]
+        mask[keep_idx] = True
+
+    return mask
+
+
+@torch.no_grad()
+def export_task_csvs(model, train_loader, list_test_loader, device, out_dir, f_size, num_classes=10, save_as="softmax", keep_frac=1.0):
+    """
+    Parameters:
+     - save_y_as: "softmax" (default) or "logits" (raw outputs)
+     - keep_frac [0, 1.0]: fraction of top samples to keep per class train-set based on confidence scores.
+
     Writes:
       - features: <out_dir>/train_feat.csv, <out_dir>/test_feat.csv   (f_size cols + 1 label)
     Returns dict of paths.
     """
     os.makedirs(out_dir, exist_ok=True)
+    save_softmax = (save_as == "softmax")
 
+    if save_as not in ("softmax", "logits"):
+        raise ValueError(f"Invalid save_as: {save_as}")
     
+    if keep_frac < 0.0 or keep_frac > 1.0:
+        raise ValueError(f"Invalid keep_frac: {keep_frac}")
+
     # Train feature CSV
-    tr_f, tr_z, tr_y = _collect_feats_logits_labels(model, train_loader, device)
+    tr_f, tr_z, tr_y = _collect_feats_logits_labels(model, train_loader, device, apply_softmax=save_softmax)
+    if keep_frac < 1.0:
+        print(f"  - Filtering train: keep top {keep_frac*100:.1f}% per class based on returned scores.")
+        filter_mask = _filter_top_fraction_per_class(tr_z, tr_y, keep_frac, num_classes)
+        tr_f = tr_f[filter_mask]
+        tr_z = tr_z[filter_mask]
+        tr_y = tr_y[filter_mask]
+    
     # column names
+    score_prefix = "s" if save_softmax else "z" # s: softmax, z: logits
     feat_cols = [f"f{i}" for i in range(tr_f.shape[1])] + [f"z{i}" for i in range(tr_z.shape[1])] + ["label"]
+    
     train_feat_csv = os.path.join(out_dir, "train_feat.csv")
     _save_df(np.concatenate([tr_f, tr_z, tr_y], axis=1), train_feat_csv, feat_cols)
     
     # Test CSV
     ts_feats, ts_logits, ts_labels = [], [], []
     for loader in list_test_loader:
-        f, z, y = _collect_feats_logits_labels(model, loader, device)
+        f, z, y = _collect_feats_logits_labels(model, loader, device, apply_softmax=save_softmax)
         ts_feats.append(f)
         ts_logits.append(z)
         ts_labels.append(y)
@@ -155,52 +202,6 @@ def export_task_csvs(model, train_loader, list_test_loader, device, out_dir, f_s
     }
 
 
-
-@torch.no_grad()
-def extract_features_and_logits(model, dataloader, device):
-    """
-    Returns:
-        Z:   [N, f_size] features
-        LOG: [N, 10] logits
-        Y:   [N]
-    """
-    model.eval(); model.to(device)
-    feats, logs, labs = [], [], []
-    for x, y in dataloader:
-        x = x.to(device)
-        logits, recon, f = model(x)
-        feats.append(f.detach().cpu())
-        logs.append(logits.detach().cpu())
-        labs.append(y.clone())
-    return torch.cat(feats), torch.cat(logs), torch.cat(labs)
-
-
-def save_gp_csv(out_dir, task_id, Z, LOG, Y):
-    """
-    Saves a CSV with columns: f_0..f_{f_size-1}, logit_0..logit_9, label
-    Used for training GP models
-    """
-    os.makedirs(out_dir, exist_ok=True)
-
-    Z_np   = Z.detach().cpu().numpy()          # [N, f_size]
-    LOG_np = LOG.detach().cpu().numpy()        # [N, 10]
-    Y_np   = Y.detach().cpu().numpy().reshape(-1, 1)  # [N, 1]
-
-    data = np.concatenate([Z_np, LOG_np, Y_np], axis=1)
-
-    f_cols   = [f"f_{i}" for i in range(Z_np.shape[1])]
-    log_cols = [f"logit_{i}" for i in range(LOG_np.shape[1])]
-    cols = f_cols + log_cols + ["label"]
-
-    df = pd.DataFrame(data, columns=cols)
-    df["label"] = df["label"].astype(int)  # keep labels as ints
-
-    path = os.path.join(out_dir, f"task{task_id}_features_logits.csv")
-    df.to_csv(path, index=False)
-    print(f"[Task {task_id}] Saved GP CSV -> {path} "
-          f"(features {tuple(Z_np.shape)}, logits {tuple(LOG_np.shape)})")
-
-
 def save_checkpoint(out_dir, task_id, model):
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"model_task{task_id}.pt")
@@ -216,16 +217,16 @@ def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
         "task_id",
         "task_digits",
         "epoch_or_final",
-        "stage",              # NEW: tag "AE" or "Head"
+        "stage",
         "train_loss",
         "train_ce",
         "train_rec",
         "train_feat_reg",
         "train_logit_reg",
-        "test_ce_loss",       # FIX: match your logging key
-        "test_acc",
+        "test_ce_loss", 
+        "test_acc_mean",
+        "test_accs_seen"
         "test_rec_loss",
-        "seen_tasks_mean_acc",
     ] + [f"acc_task{i}" for i in range(len(tasks))]
 
     if not os.path.exists(path):
@@ -238,7 +239,6 @@ def log_metrics_row(csv_path, headers, row_dict):
     row = [row_dict.get(h, "") for h in headers]
     with open(csv_path, "a", newline="") as f:
         csv.writer(f).writerow(row)
-
 
 
 
@@ -432,18 +432,14 @@ def plot_acc_over_all_tasks(
                     xs_k.append(start + ep_idx + 1)
                     ys_k.append(accs_seen[k])
         if len(xs_k) > 0:
-            plt.plot(xs_k, ys_k, linestyle="--", color=color, linestyle="--", linewidth=2,label=f"Task {k} test")
+            plt.plot(xs_k, ys_k, linestyle="--", color=color, linewidth=2,label=f"Task {k} test")
 
     plt.xlabel("Global Epoch Index")
     plt.ylabel("Accuracy (%)")
     plt.title(title)
     plt.xlim(0, global_last_epoch + 1)
     plt.grid(True, alpha=0.3)
-        plt.legend(
-        fontsize=9,
-        ncol=2,
-        frameon=False
-    )
+    plt.legend(fontsize=9, ncol=2, frameon=False)
 
     if save_path is not None:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
@@ -458,7 +454,8 @@ def plotGP_per_class_metrics_over_tasks(
     task_ids,
     metrics=("accuracy", "precision", "recall", "f1"),
     filename="gp_test_metrics.csv",
-    title="Per-class metrics over tasks"
+    title="Per-class metrics over tasks",
+    save_path=None
 ):
     """
     For each task i, reads: {root}/task{i}/{filename}
@@ -510,7 +507,7 @@ def plotGP_per_class_metrics_over_tasks(
             sub = sub.sort_values("task")
             ax.plot(
                 sub["task"],
-                sub[metric] * scale,
+                sub[metric],
                 marker="o",
                 label=f"class {c}",
                 color=color_map[c],
@@ -534,13 +531,16 @@ def plotGP_per_class_metrics_over_tasks(
 
     fig.suptitle(title, y=1.02)
     fig.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     plt.show()
 
 
-def plot_total_accuracy_over_tasks(
+def plotGP_total_accuracy_over_tasks(
     task_ids,
     filename="gp_test_metrics.csv",
-    title="Total test accuracy over tasks"
+    title="Total test accuracy over tasks",
+    save_path=None
 ):
     """
     Reads total accuracy per task from {root}/task{i}/{filename}.
@@ -572,6 +572,8 @@ def plot_total_accuracy_over_tasks(
     plt.title(title)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     plt.show()
 
 
@@ -706,21 +708,6 @@ def main():
         # track per-task instead of mean:
         eval_fn = (lambda m: eval_seen_per_task(m, seen_test_loaders, device)) if args.log_every_epoch else None
 
-        # history = train(
-        #     model=model,
-        #     trloader=tr_loader,
-        #     epochs=epochs,
-        #     lr=args.lr,
-        #     lambda_rec=args.lambda_rec,
-        #     lambda_feat=(0.0 if t == 0 else args.lambda_feat),
-        #     lambda_logit=(0.0 if t == 0 else args.lambda_logit)
-        #     old_feature_dict=(None if t == 0 else old_feature_dict),
-        #     old_logit_dict=(None if t == 0 else old_logit_dict),
-        #     freeze_head=freeze_flag,
-        #     device=device,
-        #     grad_clip=None,
-        #     eval_fn=eval_fn
-        # )
 
         history = train_2_stage(
             model=model,
@@ -747,10 +734,6 @@ def main():
         dur = time.time() - start_time
         print(f"[Task {t}] Training done in {dur/60.0:.2f} min.")
 
-        # # Save csv for GP training (features/logits/labels)
-        # Z, LOG, Y = extract_features_and_logits(model, tr_loader, device)
-        # save_gp_csv(gp_dir, t, Z, LOG, Y)
-
         # Evaluate on current task test set
         res = test(model, test_loaders[t], device=device, report_recon=True)
         print(f"[Task {t}] Test (on new class only) -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
@@ -764,7 +747,6 @@ def main():
         test_end_accs.append(res["accuracy"])
 
 
-
         # Prepare for GP
         task_dir = os.path.join(run_dir, f"task{t}")
         csv_paths = export_task_csvs(
@@ -774,10 +756,12 @@ def main():
             device=device,
             out_dir=task_dir,
             f_size=args.f_size,
-            num_classes=10
+            num_classes=10,
+            save_as="softmax",
+            keep_frac=0.95 #NOTE: keep top 95% confident samples per class (for GP training)
         )
         print(f"[Task {t}] Wrote CSVs to: {task_dir}")
-        data_tr_path = csv_paths["train_feat_csv"]   # "filtered_train_sftmx.csv"
+        data_tr_path = csv_paths["train_feat_csv"]   
         data_ts_path = csv_paths["test_feat_csv"]  
 
         # Evaluate across all seen tasks
@@ -788,64 +772,27 @@ def main():
             print(f"  Task {i} {pretty_task(tasks,i)}: {100*a:.2f}%")
         print(f"Mean over seen tasks (0..{t}): {100*mean_seen:.2f}%")
 
-        # CSV logging: end-of-task row
-        # row_end = {
-        #     "timestamp": datetime.now().isoformat(timespec="seconds"),
-        #     "task_id": t,
-        #     "task_digits": str(tasks[t]),
-        #     "epoch_or_final": f"final_e{epochs}",
-        #     "train_loss": history["loss"][-1] if "loss" in history else "",
-        #     "train_ce": history["ce"][-1] if "ce" in history else "",
-        #     "train_rec": history["rec"][-1] if "rec" in history else "",
-        #     "train_feat_reg": history["feat_reg"][-1] if "feat_reg" in history else "",
-        #     "test_ce_loss": res["ce_loss"],
-        #     "test_acc": res["accuracy"],
-        #     "test_rec_loss": res.get("rec_loss", ""),
-        #     "seen_tasks_mean_acc": mean_seen
-        # }
-        # for i in range(len(tasks)):
-        #     row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
-        # log_metrics_row(csv_path, headers, row_end)
+        # CSV logging: end-of-task row        
+        # 2-Satge Version:
         row_end = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "task_id": t,
             "task_digits": str(tasks[t]),
             "epoch_or_final": f"final_e{epochs}",
-            "stage": "Head",   # or "AE" if you also log AE finals
+            "stage": "Head",
             "train_loss": history["loss"][-1] if "loss" in history else "",
             "train_ce": history["ce"][-1] if "ce" in history else "",
             "train_rec": history["rec"][-1] if "rec" in history else "",
             "train_feat_reg": history["feat_reg"][-1] if "feat_reg" in history else "",
             "test_ce_loss": res["ce_loss"],
             "test_acc": res["accuracy"],
-            "test_rec_loss": res.get("rec_loss", ""),
-            "seen_tasks_mean_acc": mean_seen
+            "test_rec_loss": res.get("rec_loss", "")
         }
         for i in range(len(tasks)):
             row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
         log_metrics_row(csv_path, headers, row_end)
 
         # Optional per-epoch logging rows
-        # if args.log_every_epoch:
-        #     for ep_idx in range(len(history["loss"])):
-        #         row_ep = {
-        #             "timestamp": datetime.now().isoformat(timespec="seconds"),
-        #             "task_id": t,
-        #             "task_digits": str(tasks[t]),
-        #             "epoch_or_final": f"epoch_{ep_idx+1}",
-        #             "train_loss": history["loss"][ep_idx],
-        #             "train_ce": history["ce"][ep_idx],
-        #             "train_rec": history["rec"][ep_idx] if "rec" in history else "",
-        #             "train_feat_reg": history["feat_reg"][ep_idx] if "feat_reg" in history else "",
-        #             "train_logit_reg": history["logit_reg"][ep_idx] if "logit_reg" in history else "",
-        #             "train_acc": history["acc"][ep_idx],    
-        #             # test metrics per-epoch not computed to keep it fast
-        #             "test_ce_loss": "",
-        #             "test_acc": "",
-        #             "test_rec_loss": "",
-        #             "seen_tasks_mean_acc": ""
-        #         }
-        #         log_metrics_row(csv_path, headers, row_ep)
         if args.log_every_epoch:
             for ep_idx in range(len(history["loss"])):
                 stage_tag = history["stage"][ep_idx] if "stage" in history else ""
@@ -854,17 +801,17 @@ def main():
                     "task_id": t,
                     "task_digits": str(tasks[t]),
                     "epoch_or_final": f"epoch_{ep_idx+1}_{stage_tag}",
-                    "stage": stage_tag,  # NEW
+                    "stage": stage_tag,
                     "train_loss": history["loss"][ep_idx],
-                    "train_ce": history["ce"][ep_idx] if stage_tag == "Head" else "",
-                    "train_rec": history["rec"][ep_idx] if stage_tag == "AE" else "",
-                    "train_feat_reg": history["feat_reg"][ep_idx] if stage_tag == "AE" else "",
-                    "train_logit_reg": history["logit_reg"][ep_idx] if stage_tag == "Head" else "",
-                    "train_acc": history["train_acc"][ep_idx],
+                    "train_ce": history["ce"][ep_idx] if stage_tag == "Head" else "", # Head classification CE
+                    "train_rec": history["rec"][ep_idx] if stage_tag == "AE" else "", # AE recon loss
+                    "train_feat_reg": history["feat_reg"][ep_idx] if stage_tag == "AE" else "", # AE feature preservation
+                    "train_logit_reg": history["logit_reg"][ep_idx] if stage_tag == "Head" else "", # Head logit preservation
+                    "train_acc_mean": history["train_acc"][ep_idx], # this is overall train acc (average of seen classes)
+                    "train_accs_seen": history.get("test_accs_seen", [None])[ep_idx],
                     "test_ce_loss": "",
                     "test_acc": "",
                     "test_rec_loss": "",
-                    "seen_tasks_mean_acc": ""
                 }
                 log_metrics_row(csv_path, headers, row_ep)
 
@@ -949,16 +896,9 @@ def main():
     if not args.no_checkpoint:
         print(f"Checkpoints:   {ck_dir}")
 
-    # plot_acc_over_all_tasks(
-    #     histories_per_task=histories_per_task,
-    #     epochs_per_task=epochs_per_task,
-    #     per_epoch_test_acc_available=("test_acc" in histories_per_task[0]),
-    #     test_end_accs=test_end_accs,
-    #     title="MNIST Continual: Accuracy vs Global Epochs",
-    #     save_path=os.path.join(run_dir, "acc_over_time.png")
-    # )
 
     # Below is for 2-stage train, head-only (not include AE) accuracy plot
+    #FIXME: Not show test and not show previous tasks
     plot_acc_over_all_tasks(
         histories_per_task=head_histories_per_task,
         epochs_per_task=epochs_head_per_task,
@@ -967,15 +907,15 @@ def main():
     )
 
     # Plot GP metrics
-    plot_per_class_metrics_over_tasks(
+    plotGP_per_class_metrics_over_tasks(
         list(range(len(tasks))),
         metrics=("accuracy", "precision", "recall", "f1"),
-        percent=True
+        save_path=os.path.join(run_dir, "gp_per_class_metrics.png")
     )
 
-    plot_total_accuracy_over_tasks(
+    plotGP_total_accuracy_over_tasks(
         list(range(len(tasks))),
-        percent=True
+        save_path=os.path.join(run_dir, "gp_total_accuracy.png")
     )
 
 

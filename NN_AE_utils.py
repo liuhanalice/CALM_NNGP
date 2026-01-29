@@ -89,6 +89,8 @@ def build_feature_dict(model, dataloader, device=None, max_items=None, dtype=tor
 # Train / Test 
 # -----------------------------
 # -------- Train (CE + optional reconstruction loss from f_size) --------
+
+# NOTE: This version is no longer used. Use train_2_stage instead.
 def train( model,
     trloader,
     epochs=5,
@@ -194,7 +196,7 @@ def train( model,
 
         # eval per epoch
         if eval_fn is not None:
-            test_acc = float(eval_fn(model))  # expects 0..1
+            test_acc = eval_fn(model)  # expects 0..1
             history.setdefault("test_acc", []).append(100.0 * test_acc)
 
         n_batches = max(len(trloader), 1)
@@ -328,17 +330,17 @@ def train_2_stage(
         epoch_feat = total_feat / n_batches if (old_feature_dict is not None and lambda_feat_stage1 > 0) else 0.0
         epoch_acc  = 100.0 * correct / max(total, 1)
 
+        history["stage"].append("AE") # stage 1: AE
+        history["epoch"].append(ep + 1) # gliobal epoch count
+        history["loss"].append(epoch_loss) # total loss (AE recon loss + feat preserve loss)
+        history["ce"].append(0.0) # classification CE loss (not for stage 1)
+        history["rec"].append(epoch_rec) # AE recon loss
+        history["feat_reg"].append(epoch_feat) # feature preserve
+        history["logit_reg"].append(0.0) # logit preserve (not for stage 1)
+        history["train_acc"].append(epoch_acc) # train acc (head is frozen; just for visibility)
+        # history["test_acc_newtask"].append(100.0 * test_acc if test_acc is not None else None) # this is mean, = test_acc_mean
         history.setdefault("test_accs_seen", []).append(test_accs_seen)   # list or None
         history.setdefault("test_acc_mean", []).append(test_acc_mean)    # scalar or None
-        history["stage"].append("AE")
-        history["epoch"].append(ep + 1)
-        history["loss"].append(epoch_loss)
-        history["ce"].append(0.0)
-        history["rec"].append(epoch_rec)
-        history["feat_reg"].append(epoch_feat)
-        history["logit_reg"].append(0.0)
-        history["train_acc"].append(epoch_acc)
-        history["test_acc"].append(100.0 * test_acc if test_acc is not None else None) # this is mean, = test_acc_mean
 
         msg = (f"[Stage1/AE] Epoch {ep+1}/{epochs_stage1} | loss {epoch_loss:.4f} "
                f"| rec {epoch_rec:.4f} | feat {epoch_feat:.4f} | train_acc {epoch_acc:.2f}%")
@@ -402,8 +404,11 @@ def train_2_stage(
             correct += (preds == label).sum().item()
             total   += label.size(0)
 
+        test_accs_seen = None
+        test_acc_mean = None
         if eval_fn is not None:
-            test_acc = float(eval_fn(model))
+            test_accs_seen = eval_fn(model) # list of per-task accs
+            est_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
         epoch_loss  = total_loss / n_batches
@@ -417,9 +422,11 @@ def train_2_stage(
         history["ce"].append(epoch_ce)
         history["rec"].append(0.0)
         history["feat_reg"].append(0.0)
-        history["logit_reg"].append(epoch_logit)
+        history["logit_reg"].append(epoch_logit) # preserve old_logit
         history["train_acc"].append(epoch_acc)
         history["test_acc"].append(100.0 * test_acc if test_acc is not None else None)
+        history.setdefault("test_accs_seen", []).append(test_accs_seen)   # list or None
+        history.setdefault("test_acc_mean", []).append(test_acc_mean)    # scalar or None
 
         msg = (f"[Stage2/Head] Epoch {ep+1}/{epochs_stage2} | loss {epoch_loss:.4f} "
                f"| ce {epoch_ce:.4f} | logit {epoch_logit:.4f} | train_acc {epoch_acc:.2f}%")

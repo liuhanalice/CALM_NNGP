@@ -240,15 +240,25 @@ def log_metrics_row(csv_path, headers, row_dict):
         csv.writer(f).writerow(row)
 
 
-def eval_seen_mean(model, loaders_list, device):
+
+
+def eval_seen_per_task(model, loaders_list, device):
     """
-    Average accuracy across the provided test loaders (simple mean).
+    Returns list of accuracies on tasks [0..t] using each task's test loader.
     Uses existing `test(...)` as-is (no masking).
     """
     accs = []
     for ld in loaders_list:
         res = test(model, ld, device=device, report_recon=False)
         accs.append(res["accuracy"])
+    return accs
+
+def eval_seen_mean(model, loaders_list, device):
+    """
+    Average accuracy across the provided test loaders (simple mean).
+    Uses existing `test(...)` as-is (no masking).
+    """
+    accs = eval_seen_per_task(model, loaders_list, device)
     return float(np.mean(accs)) if len(accs) > 0 else 0.0
 
 @torch.no_grad()
@@ -349,6 +359,7 @@ def load_features_labels_from_Rcsv(csv_path, f_size, dtype=torch.float32, device
     labels = torch.tensor(arr[:, f_size].astype(np.int64), dtype=torch.long, device=device)
     return feats, labels
 
+
 # --- decode features back to images using your AE decoder ---
 def decode_features_to_images(model, feats, batch_size=256, clamp_range=(0.0, 1.0), device=None):
     """
@@ -374,61 +385,195 @@ def decode_features_to_images(model, feats, batch_size=256, clamp_range=(0.0, 1.
 def make_recovered_dataset(images, labels):
     return RecoveredDataset(images, labels)
 
+
 def plot_acc_over_all_tasks(
     histories_per_task,
     epochs_per_task,
-    per_epoch_test_acc_available=True,
-    test_end_accs=None,
     title="Training & Testing Accuracy over Global Epochs",
     save_path=None
 ):
-    """
-    histories_per_task: list of history dicts returned by train(), one per task.
-                        Must include history["acc"] (per-epoch train acc, 0..100).
-                        If per_epoch_test_acc_available, also include history["test_acc"] (0..100).
-    epochs_per_task: list of ints, the epoch count used for each task (len == num_tasks).
-    per_epoch_test_acc_available: bool, True if you enabled eval_fn during training.
-    test_end_accs: list of floats 0..1 for end-of-task test accuracy (len == num_tasks).
-    """
-    
-    plt.rcParams['axes.prop_cycle'] = plt.cycler(color=plt.cm.tab20.colors)
-    # Build global x-axis offsets
+    num_tasks = len(histories_per_task)
+    colors = plt.cm.tab20.colors  # 20 distinct colors
+
+    # global offsets per task block
     offsets = [0]
     for e in epochs_per_task[:-1]:
         offsets.append(offsets[-1] + e)
 
-    plt.figure()
+    plt.figure(figsize=(10, 5))
     global_last_epoch = 0
 
+    # --- 1) plot per-task training acc (only for the task being trained) ---
     for t, hist in enumerate(histories_per_task):
+        color = colors[t % len(colors)]
         start = offsets[t]
         T = len(hist.get("acc", []))
-        x = [start + i + 1 for i in range(T)]  # epoch indices start at 1 per task
-
-        # Training accuracy (solid)
-        plt.plot(x, hist["acc"], label=f"Task {t} train")
-
-        # Testing accuracy
-        if per_epoch_test_acc_available and "test_acc" in hist:
-            print("test per epoch")
-            plt.plot(x, hist["test_acc"], linestyle="--", label=f"Task {t} test")
-        else:
-            # end-of-task marker if provided
-            if test_end_accs is not None and t < len(test_end_accs):
-                end_x = start + T
-                plt.scatter([end_x], [100.0 * test_end_accs[t]], marker="o", label=f"Task {t} test (final)")
-
+        x = [start + i + 1 for i in range(T)]
+        plt.plot(x, hist["acc"], color=color, linestyle="-", linewidth=2, label=f"Task {t} train")
         global_last_epoch = max(global_last_epoch, start + T)
+
+    # --- 2) plot per-task test acc for ALL seen tasks at each epoch ---
+    # We'll reconstruct test curves for each task k by scanning through training histories.
+    # For a fixed k, it has values starting from when k becomes "seen" (training task >= k).
+    max_tasks = len(histories_per_task)
+
+    for k in range(max_tasks):
+        color = colors[k % len(colors)]
+        xs_k, ys_k = [], []
+        for t, hist in enumerate(histories_per_task):
+            if "test_accs_seen" not in hist:
+                continue
+            start = offsets[t]
+            test_list = hist["test_accs_seen"]  # list over epochs; each entry list over seen tasks
+            for ep_idx, accs_seen in enumerate(test_list):
+                if accs_seen is None:
+                    continue
+                if k < len(accs_seen):
+                    xs_k.append(start + ep_idx + 1)
+                    ys_k.append(accs_seen[k])
+        if len(xs_k) > 0:
+            plt.plot(xs_k, ys_k, linestyle="--", color=color, linestyle="--", linewidth=2,label=f"Task {k} test")
 
     plt.xlabel("Global Epoch Index")
     plt.ylabel("Accuracy (%)")
     plt.title(title)
     plt.xlim(0, global_last_epoch + 1)
     plt.grid(True, alpha=0.3)
-    plt.legend()
+        plt.legend(
+        fontsize=9,
+        ncol=2,
+        frameon=False
+    )
+
     if save_path is not None:
-        plt.savefig(save_path, bbox_inches="tight", dpi=150)
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     plt.show()
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def plotGP_per_class_metrics_over_tasks(
+    task_ids,
+    metrics=("accuracy", "precision", "recall", "f1"),
+    filename="gp_test_metrics.csv",
+    title="Per-class metrics over tasks"
+):
+    """
+    For each task i, reads: {root}/task{i}/{filename}
+    Plots subplots for metrics; x=task, y=metric value.
+    One line per class with consistent color across all subplots.
+    Classes may differ across tasks (missing points are skipped).
+    """
+    # ---- read all tasks into one df ----
+    dfs = []
+    for t in task_ids:
+        path = f"task{t}/{filename}"
+        df = pd.read_csv(path)
+        df["task"] = int(t)
+        # enforce numeric (robust to NA strings)
+        df["class"] = pd.to_numeric(df["class"], errors="coerce").astype("Int64")
+        for m in metrics:
+            if m in df.columns:
+                df[m] = pd.to_numeric(df[m], errors="coerce")
+        dfs.append(df)
+
+    all_df = pd.concat(dfs, ignore_index=True)
+    all_df = all_df.dropna(subset=["class"])
+    all_df["class"] = all_df["class"].astype(int)
+
+
+    # ---- consistent color per class ----
+    classes = sorted(all_df["class"].unique().tolist())
+    cmap = plt.get_cmap("tab20")
+    color_map = {c: cmap(i % cmap.N) for i, c in enumerate(classes)}
+
+    # ---- subplot layout ----
+    metrics = [m for m in metrics if m in all_df.columns]
+    if not metrics:
+        raise ValueError("None of the requested metrics columns exist in the CSVs.")
+
+    n = len(metrics)
+    ncols = 2 if n > 1 else 1
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6.5 * ncols, 4.2 * nrows), sharex=True)
+    axes = axes.ravel() if hasattr(axes, "ravel") else [axes]
+
+    # ---- plot each metric, one line per class ----
+    for i, metric in enumerate(metrics):
+        ax = axes[i]
+        for c in classes:
+            sub = all_df[all_df["class"] == c][["task", metric]].dropna()
+            if sub.empty:
+                continue
+            sub = sub.sort_values("task")
+            ax.plot(
+                sub["task"],
+                sub[metric] * scale,
+                marker="o",
+                label=f"class {c}",
+                color=color_map[c],
+            )
+        ax.set_title(metric)
+        ax.set_ylabel(f"{metric}")
+        ax.grid(True, alpha=0.3)
+        ax.set_xticks(list(task_ids))
+
+    # hide unused axes if any
+    for j in range(len(metrics), len(axes)):
+        axes[j].axis("off")
+
+    for ax in axes[:len(metrics)]:
+        ax.set_xlabel("Task")
+
+    # single legend for all subplots
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper right", bbox_to_anchor=(0.98, 0.98), frameon=False)
+
+    fig.suptitle(title, y=1.02)
+    fig.tight_layout()
+    plt.show()
+
+
+def plot_total_accuracy_over_tasks(
+    task_ids,
+    filename="gp_test_metrics.csv",
+    title="Total test accuracy over tasks"
+):
+    """
+    Reads total accuracy per task from {root}/task{i}/{filename}.
+    Assumes column 'total_accuracy' exists and is constant within each CSV.
+    Plots x=task, y=total_accuracy.
+    """
+    xs, ys = [], []
+    for t in task_ids:
+        path = f"task{t}/{filename}"
+        df = pd.read_csv(path)
+
+        if "total_accuracy" not in df.columns:
+            raise ValueError(f"{path} missing 'total_accuracy' column.")
+
+        # same for all rows; take first non-NA
+        val = pd.to_numeric(df["total_accuracy"], errors="coerce").dropna()
+        if val.empty:
+            raise ValueError(f"{path} has no valid numeric total_accuracy.")
+        total_acc = float(val.iloc[0])
+
+        xs.append(int(t))
+        ys.append(total_acc)
+
+    plt.figure(figsize=(7, 4))
+    plt.plot(xs, ys, marker="o")
+    plt.xticks(list(task_ids))
+    plt.xlabel("Task")
+    plt.ylabel(f"Total accuracy")
+    plt.title(title)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
 
 
 def extract_head_only_history(history_2stage):
@@ -557,8 +702,10 @@ def main():
         start_time = time.time()
         
         seen_test_loaders.append(test_loaders[t])
-        eval_fn = (lambda m: eval_seen_mean(m, seen_test_loaders, device)) if args.log_every_epoch else None
-        
+        # eval_fn = (lambda m: eval_seen_mean(m, seen_test_loaders, device)) if args.log_every_epoch else None
+        # track per-task instead of mean:
+        eval_fn = (lambda m: eval_seen_per_task(m, seen_test_loaders, device)) if args.log_every_epoch else None
+
         # history = train(
         #     model=model,
         #     trloader=tr_loader,
@@ -606,7 +753,7 @@ def main():
 
         # Evaluate on current task test set
         res = test(model, test_loaders[t], device=device, report_recon=True)
-        print(f"[Task {t}] Test (new data) -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
+        print(f"[Task {t}] Test (on new class only) -> ce_loss: {res['ce_loss']:.4f}, acc: {100*res['accuracy']:.2f}%, "
               f"rec_loss: {res.get('rec_loss', float('nan')):.4f}")
         
         histories_per_task.append(history)
@@ -811,14 +958,24 @@ def main():
     #     save_path=os.path.join(run_dir, "acc_over_time.png")
     # )
 
-    # FIXME: below is for 2-stage train 
+    # Below is for 2-stage train, head-only (not include AE) accuracy plot
     plot_acc_over_all_tasks(
         histories_per_task=head_histories_per_task,
         epochs_per_task=epochs_head_per_task,
-        per_epoch_test_acc_available=("test_acc" in head_histories_per_task[0]),
-        test_end_accs=test_end_accs,
-        title="MNIST Continual: Head-Only Accuracy vs Global Epochs",
+        title="MNIST Continual: NN (Head) Accuracy vs Global Epochs",
         save_path=os.path.join(run_dir, "acc_over_time_head_only.png")
+    )
+
+    # Plot GP metrics
+    plot_per_class_metrics_over_tasks(
+        list(range(len(tasks))),
+        metrics=("accuracy", "precision", "recall", "f1"),
+        percent=True
+    )
+
+    plot_total_accuracy_over_tasks(
+        list(range(len(tasks))),
+        percent=True
     )
 
 

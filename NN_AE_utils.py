@@ -242,7 +242,7 @@ def train_2_stage(
     # --- common ---
     device=None,
     grad_clip=None,
-    eval_fn=None               # callable(model)->acc in [0,1]
+    eval_fn=None               # callable(model)->retuen *list* of per-task accs in [0,1]
 ):
     """
     Stage 1 (AE): freeze head; train En+De with loss:
@@ -316,8 +316,11 @@ def train_2_stage(
             correct += (preds == label).sum().item()
             total   += label.size(0)
 
+        test_accs_seen = None
+        test_acc_mean = None
         if eval_fn is not None:
-            test_acc = float(eval_fn(model))
+            test_accs_seen = eval_fn(model) # list of per-task accs
+            est_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
         epoch_loss = total_loss / n_batches
@@ -325,6 +328,8 @@ def train_2_stage(
         epoch_feat = total_feat / n_batches if (old_feature_dict is not None and lambda_feat_stage1 > 0) else 0.0
         epoch_acc  = 100.0 * correct / max(total, 1)
 
+        history.setdefault("test_accs_seen", []).append(test_accs_seen)   # list or None
+        history.setdefault("test_acc_mean", []).append(test_acc_mean)    # scalar or None
         history["stage"].append("AE")
         history["epoch"].append(ep + 1)
         history["loss"].append(epoch_loss)
@@ -333,7 +338,7 @@ def train_2_stage(
         history["feat_reg"].append(epoch_feat)
         history["logit_reg"].append(0.0)
         history["train_acc"].append(epoch_acc)
-        history["test_acc"].append(100.0 * test_acc if test_acc is not None else None)
+        history["test_acc"].append(100.0 * test_acc if test_acc is not None else None) # this is mean, = test_acc_mean
 
         msg = (f"[Stage1/AE] Epoch {ep+1}/{epochs_stage1} | loss {epoch_loss:.4f} "
                f"| rec {epoch_rec:.4f} | feat {epoch_feat:.4f} | train_acc {epoch_acc:.2f}%")

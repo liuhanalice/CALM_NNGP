@@ -261,6 +261,7 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
   plot_df <- data.frame(Y_true = as.numeric(val.Y), Y_pred = out.val$mean)
   plot <- ggplot(plot_df, aes(x = Y_true, y = Y_pred)) +
     geom_point() +
+    coord_equal() +
     ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
     xlab("Y_true") + ylab("Y_pred")
 
@@ -315,6 +316,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   plot_df <- data.frame(Y_true = as.numeric(val.Y), Y_pred = out.val$mean)
   plot <- ggplot(plot_df, aes(x = Y_true, y = Y_pred)) +
     geom_point() +
+    coord_equal() +
     ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
     xlab("Y_true") + ylab("Y_pred")
 
@@ -324,7 +326,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
 
 
 # Test GP models
-test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp_package = 'gplite') {
+test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp_package = 'gplite', metrics_savepath = "gp_test_metrics.csv") {
   if (! is.list(GPmodels)) {
     stop("GPmodels must be a list (dictionaries)")
   }
@@ -373,6 +375,20 @@ test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp
 
   print(paste0("Total accuracy: ", test_accuracy))
   
+  # initialize metrics dataframe for save
+  metrics_df <- data.frame(
+    class = integer(),
+    accuracy = numeric(),
+    precision = numeric(),
+    recall = numeric(),
+    f1 = numeric(),
+    TP = integer(),
+    FP = integer(),
+    TN = integer(),
+    FN = integer(),
+    total_accuracy = numeric()
+  )
+
   # confusion matrix per class
   predicted_labels <- predicted_classes
   for (label in  unlist(test_classes)) {
@@ -401,6 +417,28 @@ test_GPs <- function(GPmodels, test_classes, GPs, test_data, test_data_label, gp
     print(paste0("Precision: ", precision))
     print(paste0("Recall for Class: ", recall))
     print(paste0("F1 Score for Class: ", f1))
+
+    metrics_df <- rbind(
+      metrics_df,
+      data.frame(
+        class = label,
+        accuracy = accuracy,
+        precision = precision,
+        recall = recall,
+        f1 = f1,
+        TP = TP,
+        FP = FP,
+        TN = TN,
+        FN = FN,
+        total_accuracy = test_accuracy
+      )
+    )
+
+    write.csv(
+      metrics_df,
+      file = metrics_savepath,
+      row.names = FALSE
+    )
   }
 
   GP_test_mean_mat_with_label <- cbind(GP_test_mean_mat, label = test_data_label[, 1])

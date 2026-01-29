@@ -203,7 +203,7 @@ testsets <- do.call(rbind, lapply(c(paste0("c", existingclass_set)), function(in
 testsets_labels <- do.call(rbind, lapply(c(paste0("c", existingclass_set)), function(index) test_data_label[[index]]))
 
 print(paste0("Testset GPs:"))
-test_result <- test_GPs(GPmodels=GPmodel_train, test_classes=existingclass_set, GPs=existingclass_set, test_data=testsets, test_data_label=testsets_labels, gp_package = GP_package)
+test_result <- test_GPs(GPmodels=GPmodel_train, test_classes=existingclass_set, GPs=existingclass_set, test_data=testsets, test_data_label=testsets_labels, gp_package = GP_package, metrics_savepath = paste0(args$save_path, "/gp_test_metrics.csv"))
 print_GP_distributions_stats(test_result$GP_test_mean_mat_with_label)
 test_result_plots <- plot_GP_distributions(test_result$GP_test_mean_mat_with_label, 
                     normal_plot_title="output distribution on different classes (testset)", normal_ymin=0, normal_ymax=0.1,

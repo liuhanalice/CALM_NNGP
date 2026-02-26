@@ -1,9 +1,11 @@
-
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
+from pathlib import Path
 
 
 def plotGP_per_class_metrics_over_tasks(
+    run_dir,
     task_ids,
     metrics=("accuracy", "precision", "recall", "f1"),
     filename="gp_test_metrics.csv",
@@ -11,7 +13,7 @@ def plotGP_per_class_metrics_over_tasks(
     save_path=None
 ):
     """
-    For each task i, reads: {root}/task{i}/{filename}
+    For each task i, reads: {run_dir}/task{i}/{filename}
     Plots subplots for metrics; x=task, y=metric value.
     One line per class with consistent color across all subplots.
     Classes may differ across tasks (missing points are skipped).
@@ -19,8 +21,9 @@ def plotGP_per_class_metrics_over_tasks(
     # ---- read all tasks into one df ----
     dfs = []
     for t in task_ids:
-        path = f"runs_mnist_continual/run_20260129_010150/task{t}/{filename}" #NOTE: hardcoded root
-        df = pd.read_csv(path)
+        path = f"task{t}/{filename}"
+        fullpath = os.path.join(run_dir, path)
+        df = pd.read_csv(fullpath)
         df["task"] = int(t)
         # enforce numeric (robust to NA strings)
         df["class"] = pd.to_numeric(df["class"], errors="coerce").astype("Int64")
@@ -90,28 +93,30 @@ def plotGP_per_class_metrics_over_tasks(
 
 
 def plotGP_total_accuracy_over_tasks(
+    run_dir,
     task_ids,
     filename="gp_test_metrics.csv",
     title="Total test accuracy over tasks",
     save_path=None
 ):
     """
-    Reads total accuracy per task from {root}/task{i}/{filename}.
+    Reads total accuracy per task from {run_dir}/task{i}/{filename}.
     Assumes column 'total_accuracy' exists and is constant within each CSV.
     Plots x=task, y=total_accuracy.
     """
     xs, ys = [], []
     for t in task_ids:
-        path = f"runs_mnist_continual/run_20260129_010150/task{t}/{filename}" #NOTE: hardcoded root
-        df = pd.read_csv(path)
+        path = f"task{t}/{filename}"
+        fullpath = os.path.join(run_dir, path)
+        df = pd.read_csv(fullpath)
 
         if "total_accuracy" not in df.columns:
-            raise ValueError(f"{path} missing 'total_accuracy' column.")
+            raise ValueError(f"{fullpath} missing 'total_accuracy' column.")
 
         # same for all rows; take first non-NA
         val = pd.to_numeric(df["total_accuracy"], errors="coerce").dropna()
         if val.empty:
-            raise ValueError(f"{path} has no valid numeric total_accuracy.")
+            raise ValueError(f"{fullpath} has no valid numeric total_accuracy.")
         total_acc = float(val.iloc[0])
 
         xs.append(int(t))
@@ -132,13 +137,17 @@ def plotGP_total_accuracy_over_tasks(
 
 if __name__ == "__main__":
     # Example usage
+    run_dir="./runs_mnist_continual/run_20260219_015207_labelAware"
+
     plotGP_per_class_metrics_over_tasks(
-        list(range(6)),
+        run_dir=run_dir,
+        task_ids=list(range(6)),
         metrics=("accuracy", "precision", "recall", "f1"),
         save_path="GPper_class_metrics.png"
     )
 
     plotGP_total_accuracy_over_tasks(
-        list(range(6)),
+        run_dir=run_dir,
+        task_ids=list(range(6)),
         save_path="GP_total_accuracy.png"
     )

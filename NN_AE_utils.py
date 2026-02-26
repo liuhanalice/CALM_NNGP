@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import ConcatDataset, DataLoader, Subset, TensorDataset
 import random
 import os
+import copy
 import matplotlib.pyplot as plt
 
 from NN_AE import CALM_AE_NN
@@ -90,7 +91,7 @@ def build_feature_dict(model, dataloader, device=None, max_items=None, dtype=tor
 # -----------------------------
 # -------- Train (CE + optional reconstruction loss from f_size) --------
 
-# NOTE: This version is no longer used. Use train_2_stage instead.
+# NOTE: This version is no longer used. 
 def train( model,
     trloader,
     epochs=5,
@@ -225,6 +226,7 @@ def train( model,
     return history
 
 
+# NOTE: This version is no longer used. 
 def train_2_stage(
     model: CALM_AE_NN,
     trloader,
@@ -322,7 +324,7 @@ def train_2_stage(
         test_acc_mean = None
         if eval_fn is not None:
             test_accs_seen = eval_fn(model) # list of per-task accs
-            est_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+            test_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
         epoch_loss = total_loss / n_batches
@@ -434,6 +436,323 @@ def train_2_stage(
         print(msg)
 
     return history
+
+
+# The logit extension map
+def phi_extend(z_prev, Kt, fill="mean"):
+    """
+    Extend logit vector to have Kt size
+
+    fill method:
+    1) mean  2) zer0  3) const:{c}
+    """
+    # z_prev: [B, K_prev]
+    B, K_prev = z_prev.shape
+    if Kt == K_prev:
+        return z_prev
+    if fill == "mean":
+        # c = z_prev.mean(dim=1, keepdim=True)
+        if K_prev <= 1:
+            c = torch.zeros(B, 1, device=z_prev.device, dtype=z_prev.dtype)
+        else:
+            max_idx = z_prev.argmax(dim=1, keepdim=True)  # [B,1]
+            # mask out the max column
+            mask = torch.ones_like(z_prev, dtype=torch.bool)
+            mask.scatter_(1, max_idx, False)              # False at max positions
+            # sum remaining logits and divide by (K_prev - 1)
+            sum_excl = (z_prev * mask.to(z_prev.dtype)).sum(dim=1, keepdim=True)
+            c = sum_excl / (K_prev - 1)
+    elif fill == "zero":
+        c = torch.zeros(B, 1, device=z_prev.device, dtype=z_prev.dtype)
+    elif fill.startswith("const:"):
+        val = float(fill.split(":", 1)[1])
+        c = torch.full((B,1), val, device=z_prev.device, dtype=z_prev.dtype)
+    else:
+        raise ValueError(fill)
+    pad = c.repeat(1, Kt - K_prev)
+    return torch.cat([z_prev, pad], dim=1)
+
+
+
+def train_2_stage_class_aware(
+    model,
+    teacher_model,          # frozen snapshot from previous task
+    trloader,
+    old_classes,            # iterable of ints (classes seen before task t)
+    new_classes,            # iterable of ints (classes introduced at task t)
+    # stage 1
+    epochs_stage1=3,
+    lr_stage1=1e-3,
+    lambda_rec=1.0,
+    lambda_feat=1.0,
+    rec_on="new",           # "new" or "all"
+    # stage 2
+    epochs_stage2=3,
+    lr_stage2=1e-3,
+    lambda_ce=1.0,
+    lambda_logit=1.0,
+    ce_on="new",            # "new" or "all"
+    phi_fill="mean",        # optional mask over logits (explicitly choose which columns of logits to preserve)
+    # common
+    device=None,
+    grad_clip=None,
+    eval_fn=None,
+):
+    """
+    Two-Stage Class-Incremental Training
+
+    This function implements the following training strategy:
+
+    ------------------------------------------------------------
+    Stage 1: Autoencoder Adaptation (Encoder + Decoder updated)
+    ------------------------------------------------------------
+        Goal:
+            Adapt representation to new-task data
+            while preserving feature space for OLD classes.
+
+        Head is frozen.
+
+        Loss:
+            L_stage1 =
+                λ_rec  * Reconstruction Loss (on NEW or ALL samples)
+              + λ_feat * Feature Distillation Loss (OLD samples only)
+
+        Feature distillation:
+            MSE(f_current(x_old), f_teacher(x_old))
+
+    ------------------------------------------------------------
+    Stage 2: Classifier Head Adaptation
+    ------------------------------------------------------------
+        Goal:
+            Learn to classify new classes
+            while preserving decision boundary for old classes.
+
+        Encoder/Decoder are frozen.
+
+        Loss:
+            L_stage2 =
+                λ_ce     * CrossEntropy (NEW or ALL samples)
+              + λ_logit  * Logit Distillation (OLD samples only)
+
+        Logit distillation:
+            MSE(z_current(x_old), z_teacher(x_old))
+            (optionally masked to OLD classes only)
+
+    ------------------------------------------------------------
+    OLD vs NEW class split is determined using true labels.
+    No per-sample dictionary matching is used.
+    Teacher model provides preservation targets dynamically.
+
+    Returns:
+        history dictionary containing per-epoch metrics.
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    teacher_model.to(device).eval()
+    for p in teacher_model.parameters():
+        p.requires_grad = False
+
+    old_classes = list(map(int, old_classes))
+    new_classes = list(map(int, new_classes))
+
+    old_set = set(old_classes)
+    new_set = set(new_classes)
+
+    old_cols = sorted(old_classes)                       # columns in teacher/student corresponding to old classes
+    seen_cols = sorted(list(old_set.union(new_set)))     # columns corresponding to all seen classes (old + current new)
+    K_prev = len(old_cols)
+    K_seen = len(seen_cols)
+
+    # map global class id -> position in old_cols
+    old_pos = {c: i for i, c in enumerate(old_cols)}
+
+    history = {
+        "stage": [],
+        "epoch": [],
+        "loss": [],
+        "rec": [],
+        "feat_reg": [],
+        "ce": [],
+        "logit_reg": [],
+        "train_acc": [],            
+        "test_accs_seen": [],       # list-of-lists per epoch (if eval_fn provided)
+        "test_acc_mean": [],        # scalar mean (if eval_fn provided)
+    }
+
+    # ----------------
+    # Stage 1: AE
+    # ----------------
+    freeze_classifier_head(model)
+    unfreeze_encoder_decoder(model)
+    opt1 = _make_optimizer(model, lr_stage1)
+
+    for ep in range(epochs_stage1):
+        model.train()
+        total_loss = total_rec = total_feat = 0.0
+        correct = total = 0
+        n_batches = 0
+
+        for x, y in trloader:
+            x, y = x.to(device), y.to(device)
+            # Determine samples belong to old or new classes
+            y_list = y.detach().cpu().tolist()
+            new_mask = torch.tensor([yy in new_set for yy in y_list], device=device, dtype=torch.bool)
+            old_mask = torch.tensor([yy in old_set for yy in y_list], device=device, dtype=torch.bool)
+
+            opt1.zero_grad()
+            logits, recon, feat = model(x)
+
+            # ---------------- Reconstruction Loss ----------------
+            rec = torch.tensor(0.0, device=device)
+
+            if lambda_rec > 0:
+                if rec_on == "all":
+                    rec = F.mse_loss(recon, x)
+                elif rec_on == "new" and new_mask.any():
+                    rec = F.mse_loss(recon[new_mask], x[new_mask])
+
+
+            # ---------------- Feature Preservation ----------------
+            feat_reg = torch.tensor(0.0, device=device)
+
+            if lambda_feat > 0 and old_mask.any():
+                with torch.no_grad():
+                    _, _, feat_teacher = teacher_model(x[old_mask])
+                feat_reg = F.mse_loss(feat[old_mask], feat_teacher)
+
+            # Combined loss
+            loss = lambda_rec * rec + lambda_feat * feat_reg
+            loss.backward()
+
+            if grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+
+            opt1.step()
+
+            total_loss += loss.item()
+            total_rec += rec.item()
+            total_feat += feat_reg.item()
+            n_batches += 1
+
+            # train acc (full head)
+            preds = logits.argmax(dim=1)
+            correct += (preds == y).sum().item()
+            total += y.size(0)
+
+        # Evaluation
+        test_accs_seen = None
+        test_acc_mean = None
+        if eval_fn is not None:
+            test_accs_seen = eval_fn(model)  # list of per-task accs (your driver)
+            test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+
+        history["stage"].append("AE")
+        history["epoch"].append(ep + 1)
+        history["loss"].append(total_loss / max(n_batches, 1))
+        history["rec"].append(total_rec / max(n_batches, 1))
+        history["feat_reg"].append(total_feat / max(n_batches, 1))
+        history["ce"].append(0.0) # this is for stage 2
+        history["logit_reg"].append(0.0) # this is for stage 2
+        history["train_acc"].append(100.0 * correct / max(total, 1))
+        history["test_accs_seen"].append(test_accs_seen)
+        history["test_acc_mean"].append(test_acc_mean)
+
+        print(f"[Stage1/AE] ep {ep+1}/{epochs_stage1} | loss {history['loss'][-1]:.4f} "
+              f"| rec {history['rec'][-1]:.4f} | feat {history['feat_reg'][-1]:.4f} "
+              f"| train_acc {history['train_acc'][-1]:.2f}%")
+
+    # ----------------
+    # Stage 2: Head
+    # ----------------
+    freeze_encoder_decoder(model)
+    unfreeze_classifier_head(model)
+    opt2 = _make_optimizer(model, lr_stage2)
+
+    for ep in range(epochs_stage2):
+        model.train()
+        total_loss = total_ce = total_logit = 0.0
+        correct = total = 0
+        n_batches = 0
+
+        for x, y in trloader:
+            x, y = x.to(device), y.to(device)
+            y_list = y.detach().cpu().tolist()
+            new_mask = torch.tensor([yy in new_set for yy in y_list], device=device, dtype=torch.bool)
+            old_mask = torch.tensor([yy in old_set for yy in y_list], device=device, dtype=torch.bool)
+
+            opt2.zero_grad()
+            logits, recon, feat = model(x)
+
+            # ---------------- Cross-Entropy ----------------
+            ce = torch.tensor(0.0, device=device)
+
+            if lambda_ce > 0:
+                if ce_on == "all":
+                    ce = F.cross_entropy(logits, y)
+                elif ce_on == "new" and new_mask.any():
+                    ce = F.cross_entropy(logits[new_mask], y[new_mask])
+
+            # ---------------- Logit Preservation ----------------
+            logit_reg = torch.tensor(0.0, device=device)
+
+            if lambda_logit > 0 and old_mask.any() and K_prev > 0:
+                x_old = x[old_mask]
+                y_old = y[old_mask]
+
+                with torch.no_grad():
+                    z_teacher_full, _, _ = teacher_model(x_old)
+                
+                z_teacher_old = z_teacher_full[:, old_cols]
+                z_teacher_phi = phi_extend(z_teacher_old, Kt=K_seen, fill=phi_fill)
+
+                # student logits restricted to SEEN columns (old+new)
+                z_student_seen = logits[old_mask][:, seen_cols]  # [B_old, K_seen]
+                logit_reg = F.mse_loss(z_student_seen, z_teacher_phi)
+
+
+            loss = lambda_ce * ce + lambda_logit * logit_reg
+            loss.backward()
+
+            if grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+
+            opt2.step()
+
+            total_loss += loss.item()
+            total_ce += ce.item()
+            total_logit += logit_reg.item()
+            n_batches += 1
+
+            preds = logits.argmax(dim=1)
+            correct += (preds == y).sum().item()
+            total += y.size(0)
+
+        # Evaluation
+        test_accs_seen = None
+        test_acc_mean = None
+        if eval_fn is not None:
+            test_accs_seen = eval_fn(model)
+            test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+
+        history["stage"].append("Head")
+        history["epoch"].append(ep + 1)
+        history["loss"].append(total_loss / max(n_batches, 1))
+        history["rec"].append(0.0) # this is only for stage1
+        history["feat_reg"].append(0.0) # this is only for stage1
+        history["ce"].append(total_ce / max(n_batches, 1))
+        history["logit_reg"].append(total_logit / max(n_batches, 1))
+        history["train_acc"].append(100.0 * correct / max(total, 1))
+        history["test_accs_seen"].append(test_accs_seen)
+        history["test_acc_mean"].append(test_acc_mean)
+
+        print(f"[Stage2/Head] ep {ep+1}/{epochs_stage2} | loss {history['loss'][-1]:.4f} "
+              f"| ce {history['ce'][-1]:.4f} | logit {history['logit_reg'][-1]:.4f} "
+              f"| train_acc {history['train_acc'][-1]:.2f}%")
+
+    return history
+
+
 
 # -------- Test (plain CE; optional recon loss reporting) --------
 @torch.no_grad()

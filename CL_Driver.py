@@ -7,6 +7,7 @@ import math
 import random
 import argparse
 from datetime import datetime
+from copy import deepcopy
 import re
 import matplotlib.pyplot as plt
 import shlex
@@ -29,7 +30,8 @@ from NN_AE_utils import (
     train,  # CE + λ_rec*MSE(recon,x) + λ_feat*MSE(f,f_prev)
     test,                             # eval CE (and optional recon report)
     build_feature_dict,               # caches {image_bytes -> f_size feature}
-    train_2_stage
+    train_2_stage,
+    train_2_stage_class_aware
 )
 
 # =============== Costomized Dataset Class: Matching with MNIST format ===============
@@ -218,14 +220,16 @@ def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
         "task_digits",
         "epoch_or_final",
         "stage",
-        "train_loss",
-        "train_ce",
-        "train_rec",
-        "train_feat_reg",
-        "train_logit_reg",
+        "train_loss_ae",
+        "train_loss_head",
+        "train_ce_head",
+        "train_rec_ae",
+        "train_feat_reg_ae",
+        "train_logit_reg_head",
+        "train_acc",
         "test_ce_loss", 
         "test_acc_mean",
-        "test_accs_seen"
+        "test_accs_seen",
         "test_rec_loss",
     ] + [f"acc_task{i}" for i in range(len(tasks))]
 
@@ -407,9 +411,9 @@ def plot_acc_over_all_tasks(
     for t, hist in enumerate(histories_per_task):
         color = colors[t % len(colors)]
         start = offsets[t]
-        T = len(hist.get("acc", []))
+        T = len(hist.get("train_acc", []))
         x = [start + i + 1 for i in range(T)]
-        plt.plot(x, hist["acc"], color=color, linestyle="-", linewidth=2, label=f"Task {t} train")
+        plt.plot(x, hist["train_acc"], color=color, linestyle="-", linewidth=2, label=f"Task {t} train")
         global_last_epoch = max(global_last_epoch, start + T)
 
     # --- 2) plot per-task test acc for ALL seen tasks at each epoch ---
@@ -446,11 +450,9 @@ def plot_acc_over_all_tasks(
     plt.show()
 
 
-import pandas as pd
-import matplotlib.pyplot as plt
-
 
 def plotGP_per_class_metrics_over_tasks(
+    run_dir,
     task_ids,
     metrics=("accuracy", "precision", "recall", "f1"),
     filename="gp_test_metrics.csv",
@@ -458,7 +460,7 @@ def plotGP_per_class_metrics_over_tasks(
     save_path=None
 ):
     """
-    For each task i, reads: {root}/task{i}/{filename}
+    For each task i, reads: {run_dir}/task{i}/{filename}
     Plots subplots for metrics; x=task, y=metric value.
     One line per class with consistent color across all subplots.
     Classes may differ across tasks (missing points are skipped).
@@ -467,7 +469,8 @@ def plotGP_per_class_metrics_over_tasks(
     dfs = []
     for t in task_ids:
         path = f"task{t}/{filename}"
-        df = pd.read_csv(path)
+        fullpath = os.path.join(run_dir, path)
+        df = pd.read_csv(fullpath)
         df["task"] = int(t)
         # enforce numeric (robust to NA strings)
         df["class"] = pd.to_numeric(df["class"], errors="coerce").astype("Int64")
@@ -537,28 +540,30 @@ def plotGP_per_class_metrics_over_tasks(
 
 
 def plotGP_total_accuracy_over_tasks(
+    run_dir,
     task_ids,
     filename="gp_test_metrics.csv",
     title="Total test accuracy over tasks",
     save_path=None
 ):
     """
-    Reads total accuracy per task from {root}/task{i}/{filename}.
+    Reads total accuracy per task from {run_dir}/task{i}/{filename}.
     Assumes column 'total_accuracy' exists and is constant within each CSV.
     Plots x=task, y=total_accuracy.
     """
     xs, ys = [], []
     for t in task_ids:
         path = f"task{t}/{filename}"
-        df = pd.read_csv(path)
+        fullpath = os.path.join(run_dir, path)
+        df = pd.read_csv(fullpath)
 
         if "total_accuracy" not in df.columns:
-            raise ValueError(f"{path} missing 'total_accuracy' column.")
+            raise ValueError(f"{fullpath} missing 'total_accuracy' column.")
 
         # same for all rows; take first non-NA
         val = pd.to_numeric(df["total_accuracy"], errors="coerce").dropna()
         if val.empty:
-            raise ValueError(f"{path} has no valid numeric total_accuracy.")
+            raise ValueError(f"{fullpath} has no valid numeric total_accuracy.")
         total_acc = float(val.iloc[0])
 
         xs.append(int(t))
@@ -580,23 +585,23 @@ def plotGP_total_accuracy_over_tasks(
 
 def extract_head_only_history(history_2stage):
     """
-    Convert a train_2_stage history (with 'stage' and 'train_acc') into a
-    single-stage history dict compatible with plot_acc_over_all_tasks,
-    keeping ONLY the 'Head' epochs.
+    Keep ONLY the epochs where stage == "Head",
+    preserving all keys consistently.
     """
+
     mask = [s == "Head" for s in history_2stage.get("stage", [])]
 
-    head_hist = {
-        "acc":        [a for a, m in zip(history_2stage.get("train_acc", []), mask) if m],
-        "test_acc":   [t for t, m in zip(history_2stage.get("test_acc", []), mask) if m],
-        "loss":       [l for l, m in zip(history_2stage.get("loss", []), mask) if m],
-        "ce":         [c for c, m in zip(history_2stage.get("ce", []), mask) if m],
-        "logit_reg":  [r for r, m in zip(history_2stage.get("logit_reg", []), mask) if m],
-        # optional: keep stage/epoch if you want to annotate
-        "epoch":      [e for e, m in zip(history_2stage.get("epoch", []), mask) if m],
-    }
-    return head_hist
+    head_hist = {}
 
+    for key, values in history_2stage.items():
+        # Only process list-like entries with same length as stage
+        if isinstance(values, list) and len(values) == len(mask):
+            head_hist[key] = [v for v, m in zip(values, mask) if m]
+        else:
+            # keep non-epoch keys untouched (rare case)
+            head_hist[key] = values
+
+    return head_hist
 
 # =============== Main Driver ===============
 
@@ -607,7 +612,7 @@ def main():
     parser.add_argument("--gp_out",    type=str, default="gp_data")
     parser.add_argument("--ckpt_out",  type=str, default="checkpoints")
     parser.add_argument("--f_size",    type=int, default=16, help="feature dim after adapter")
-    parser.add_argument("--epochs0",   type=int, default=30,  help="epochs for task 0")
+    parser.add_argument("--epochs0",   type=int, default=60,  help="epochs for task 0")
     parser.add_argument("--epochs",    type=int, default=30,  help="epochs for tasks 1..")
     parser.add_argument("--lr",        type=float, default=1e-3)
     parser.add_argument("--lr_AE",     type=float, default=1e-4)
@@ -669,9 +674,11 @@ def main():
     # Model
     model = CALM_AE_NN(f_size=args.f_size, num_classes=10).to(device)
 
-    # For feature-preservation, cache features after each task
-    old_feature_dict = None
-    old_logit_dict = None
+    # --- No longer needed using train_2_stage_label_aware ---
+    # # For feature-preservation, cache features after each task
+    # old_feature_dict = None
+    # old_logit_dict = None
+    
     seen_test_loaders = []
 
     # Per Epoch Evaluation
@@ -687,20 +694,8 @@ def main():
         print(f"Training samples size: {len(tr_loader.dataset)}")
         print("="*80)
 
-        # Freeze head for tasks after 0
-        # freeze_flag = False
-        # if t == 0:
-        #     freeze_flag = False
-        #     print("Task 0: head is UNFROZEN (learning initial classifier).")
-        # else:
-        #     freeze_flag = True
-        #     print("Task >0: FREEZING classifier head (fc2+fc3).")
-
-        # NOTE: Do not freeze 
-        freeze_flag = False
-
         # Train
-        epochs = args.epochs0 if t == 0 else args.epochs
+        epochs = args.epochs0 if t == 0 else (args.epochs)*t  # train more epochs as tasks coming
         start_time = time.time()
         
         seen_test_loaders.append(test_loaders[t])
@@ -709,27 +704,74 @@ def main():
         eval_fn = (lambda m: eval_seen_per_task(m, seen_test_loaders, device)) if args.log_every_epoch else None
 
 
-        history = train_2_stage(
+        # history = train_2_stage(
+        #     model=model,
+        #     trloader=tr_loader,
+        #     # --- Stage 1 (AE) ---
+        #     epochs_stage1=epochs,
+        #     lr_stage1=args.lr_AE,
+        #     lambda_rec_stage1=args.lambda_rec,     # recon loss weight
+        #     lambda_feat_stage1=(0.0 if t == 0 else args.lambda_feat),    # feature preservation weight (MSE(f_curr, f_prev))
+        #     old_feature_dict=(None if t == 0 else old_feature_dict),     # {image_bytes: f_prev_tensor}
+        #     # --- Stage 2 (Head) ---
+        #     epochs_stage2=epochs,
+        #     lr_stage2=args.lr_head,
+        #     lambda_ce_stage2=1.0,      # CE weight
+        #     lambda_logit_stage2=(0.0 if t == 0 else args.lambda_logit),   # logit preservation weight (MSE(z_curr, z_prev[mask]))
+        #     old_logit_dict=(None if t == 0 else old_logit_dict),       # {image_bytes: z_prev_tensor} (prev logits)
+        #     logit_mask=None,           # torch.BoolTensor[num_classes] or None
+        #     # --- common ---
+        #     device=device,
+        #     grad_clip=None,
+        #     eval_fn=eval_fn               # callable(model)->acc in [0,1]
+        # )
+        
+        # ---- For train_2_stage_label_aware ---------
+        # Build old/new class sets for this task (global class ids)
+        old_classes = sum(tasks[:t], [])      # all digits seen before task t (flatten to a list)
+        new_classes = tasks[t]               # digits introduced at task t
+
+        # Teacher snapshot BEFORE training this task
+        teacher_model = deepcopy(model).to(device).eval()
+        for p in teacher_model.parameters():
+            p.requires_grad = False
+
+        # Optional: preserve only OLD logits (recommended)
+        # logit_mask = torch.zeros(10, dtype=torch.bool, device=device)
+        # if len(old_classes) > 0:
+        #     logit_mask[torch.tensor(old_classes, dtype=torch.long, device=device)] = True
+        # else:
+        #     logit_mask = None
+        
+        history = train_2_stage_class_aware(
             model=model,
+            teacher_model=teacher_model,
             trloader=tr_loader,
-            # --- Stage 1 (AE) ---
+            old_classes=old_classes,
+            new_classes=new_classes,
+
+            # -------- Stage 1 (AE) --------
             epochs_stage1=epochs,
             lr_stage1=args.lr_AE,
-            lambda_rec_stage1=args.lambda_rec,     # recon loss weight
-            lambda_feat_stage1=(0.0 if t == 0 else args.lambda_feat),    # feature preservation weight (MSE(f_curr, f_prev))
-            old_feature_dict=(None if t == 0 else old_feature_dict),     # {image_bytes: f_prev_tensor}
-            # --- Stage 2 (Head) ---
+            lambda_rec=args.lambda_rec,
+            lambda_feat=(0.0 if t == 0 else args.lambda_feat),
+            rec_on="new",                 # recon only on NEW-class samples
+
+            # -------- Stage 2 (Head) --------
             epochs_stage2=epochs,
             lr_stage2=args.lr_head,
-            lambda_ce_stage2=1.0,      # CE weight
-            lambda_logit_stage2=(0.0 if t == 0 else args.lambda_logit),   # logit preservation weight (MSE(z_curr, z_prev[mask]))
-            old_logit_dict=(None if t == 0 else old_logit_dict),       # {image_bytes: z_prev_tensor} (prev logits)
-            logit_mask=None,           # torch.BoolTensor[num_classes] or None
-            # --- common ---
+            lambda_ce=1.0,
+            lambda_logit=(0.0 if t == 0 else args.lambda_logit),
+            ce_on="new",                  # CE only on new samples
+            phi_fill="mean",       
+
+            # -------- Common --------
             device=device,
             grad_clip=None,
-            eval_fn=eval_fn               # callable(model)->acc in [0,1]
+            eval_fn=eval_fn
         )
+        # ----------------------------------------------
+
 
         dur = time.time() - start_time
         print(f"[Task {t}] Training done in {dur/60.0:.2f} min.")
@@ -743,7 +785,7 @@ def main():
         epochs_per_task.append(epochs)
         # For 2 stage train:
         head_histories_per_task = [extract_head_only_history(h) for h in histories_per_task]
-        epochs_head_per_task = [len(h["acc"]) for h in head_histories_per_task]
+        epochs_head_per_task = [len(h["train_acc"]) for h in head_histories_per_task]
         test_end_accs.append(res["accuracy"])
 
 
@@ -774,22 +816,29 @@ def main():
 
         # CSV logging: end-of-task row        
         # 2-Satge Version:
+        idx_head = max(i for i,s in enumerate(history["stage"]) if s == "Head")
+        idx_ae   = max(i for i,s in enumerate(history["stage"]) if s == "AE")
+        
         row_end = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "task_id": t,
             "task_digits": str(tasks[t]),
             "epoch_or_final": f"final_e{epochs}",
-            "stage": "Head",
-            "train_loss": history["loss"][-1] if "loss" in history else "",
-            "train_ce": history["ce"][-1] if "ce" in history else "",
-            "train_rec": history["rec"][-1] if "rec" in history else "",
-            "train_feat_reg": history["feat_reg"][-1] if "feat_reg" in history else "",
+            "stage": "Final",
+            "train_loss_ae": history["loss"][idx_ae],
+            "train_loss_head": history["loss"][idx_head],
+            "train_ce_head": history["ce"][idx_head],
+            "train_logit_reg_head": history["logit_reg"][idx_head],
+            "train_rec_ae": history["rec"][idx_ae],
+            "train_feat_reg_ae": history["feat_reg"][idx_ae],
+            "train_acc": history["train_acc"][idx_head],
             "test_ce_loss": res["ce_loss"],
-            "test_acc": res["accuracy"],
-            "test_rec_loss": res.get("rec_loss", "")
+            "test_rec_loss": res.get("rec_loss", ""),
+            "test_acc_mean": mean_seen,
+            "test_accs_seen": accs_seen
         }
-        for i in range(len(tasks)):
-            row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
+        # for i in range(len(tasks)):
+        #     row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
         log_metrics_row(csv_path, headers, row_end)
 
         # Optional per-epoch logging rows
@@ -802,15 +851,16 @@ def main():
                     "task_digits": str(tasks[t]),
                     "epoch_or_final": f"epoch_{ep_idx+1}_{stage_tag}",
                     "stage": stage_tag,
-                    "train_loss": history["loss"][ep_idx],
-                    "train_ce": history["ce"][ep_idx] if stage_tag == "Head" else "", # Head classification CE
-                    "train_rec": history["rec"][ep_idx] if stage_tag == "AE" else "", # AE recon loss
-                    "train_feat_reg": history["feat_reg"][ep_idx] if stage_tag == "AE" else "", # AE feature preservation
-                    "train_logit_reg": history["logit_reg"][ep_idx] if stage_tag == "Head" else "", # Head logit preservation
-                    "train_acc_mean": history["train_acc"][ep_idx], # this is overall train acc (average of seen classes)
-                    "train_accs_seen": history.get("test_accs_seen", [None])[ep_idx],
-                    "test_ce_loss": "",
-                    "test_acc": "",
+                    "train_loss_ae": history["loss"][ep_idx] if stage_tag == "AE" else "",
+                    "train_loss_head": history["loss"][ep_idx] if stage_tag == "HEAD" else "",
+                    "train_ce_head": history["ce"][ep_idx] if stage_tag == "Head" else "", # Head classification CE
+                    "train_rec_ae": history["rec"][ep_idx] if stage_tag == "AE" else "", # AE recon loss
+                    "train_feat_reg_ae": history["feat_reg"][ep_idx] if stage_tag == "AE" else "", # AE feature preservation
+                    "train_logit_reg_head": history["logit_reg"][ep_idx] if stage_tag == "Head" else "", # Head logit preservation
+                    "train_acc": history["train_acc"][ep_idx], # this is overall train acc (training classification accuracy average of seen classes)
+                    "test_acc_mean": history.get("test_acc_mean", [None])[ep_idx],
+                    "test_accs_seen": history.get("test_accs_seen", [None])[ep_idx],
+                    "test_ce_loss": "", # I didn't track this per epoch
                     "test_rec_loss": "",
                 }
                 log_metrics_row(csv_path, headers, row_ep)
@@ -876,18 +926,19 @@ def main():
                 drop_last=False
             )
 
-            # Build/update feature dict AFTER task t (to preserve seen features next task)
-            print(f"[Task {t}] Caching f_size features for feature-preservation in next task...")
-            cache_loader = DataLoader(Subset(train_ds, filter_indices_by_labels(train_ds, sum(tasks[:t+1], []))),
-                                    batch_size=args.test_bs, shuffle=False, num_workers=2, pin_memory=True)
-            old_feature_dict, old_logit_dict = build_feature_dict(
-                model=model,
-                dataloader=cache_loader,
-                device=device,
-                max_items=args.max_cache_items,
-                dtype=torch.float32
-            )
-            print(f"[Task {t}] Cached features: {len(old_feature_dict)} items.")
+
+            # # Build/update feature dict AFTER task t (to preserve seen features next task)
+            # print(f"[Task {t}] Caching f_size features for feature-preservation in next task...")
+            # cache_loader = DataLoader(Subset(train_ds, filter_indices_by_labels(train_ds, sum(tasks[:t+1], []))),
+            #                         batch_size=args.test_bs, shuffle=False, num_workers=2, pin_memory=True)
+            # old_feature_dict, old_logit_dict = build_feature_dict(
+            #     model=model,
+            #     dataloader=cache_loader,
+            #     device=device,
+            #     max_items=args.max_cache_items,
+            #     dtype=torch.float32
+            # )
+            # print(f"[Task {t}] Cached features: {len(old_feature_dict)} items.")
 
     print("\nAll tasks complete.")
     print(f"Run directory: {run_dir}")
@@ -908,13 +959,15 @@ def main():
 
     # Plot GP metrics
     plotGP_per_class_metrics_over_tasks(
-        list(range(len(tasks))),
+        run_dir=run_dir,
+        task_ids=list(range(len(tasks))),
         metrics=("accuracy", "precision", "recall", "f1"),
         save_path=os.path.join(run_dir, "gp_per_class_metrics.png")
     )
 
     plotGP_total_accuracy_over_tasks(
-        list(range(len(tasks))),
+        run_dir=run_dir,
+        task_ids=list(range(len(tasks))),
         save_path=os.path.join(run_dir, "gp_total_accuracy.png")
     )
 

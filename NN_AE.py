@@ -44,8 +44,8 @@ class CALM_AE_NN(nn.Module):
         return adapter_f
 
     def forward_from_adapter(self, adapter_f):
-        z = F.relu(self.fc2(adapter_f))                             # [B,16]
-        logits = self.fc3(F.normalize(z, p=2, dim=1))               # classification
+        z = F.relu(self.fc2(adapter_f))                             # [B, 16]
+        logits = self.fc3(F.normalize(z, p=2, dim=1))               # [B, num_classes] classification
         return logits
 
     # -------- Decoder --------

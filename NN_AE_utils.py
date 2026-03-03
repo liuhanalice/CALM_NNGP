@@ -324,6 +324,7 @@ def train_2_stage(
         test_acc_mean = None
         if eval_fn is not None:
             test_accs_seen = eval_fn(model) # list of per-task accs
+            test_accs_seen = [acc * 100 for acc in test_accs_seen]
             test_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
@@ -410,6 +411,7 @@ def train_2_stage(
         test_acc_mean = None
         if eval_fn is not None:
             test_accs_seen = eval_fn(model) # list of per-task accs
+            test_accs_seen = [acc * 100 for acc in test_accs_seen]
             est_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
@@ -644,7 +646,8 @@ def train_2_stage_class_aware(
         test_accs_seen = None
         test_acc_mean = None
         if eval_fn is not None:
-            test_accs_seen = eval_fn(model)  # list of per-task accs (your driver)
+            test_accs_seen = eval_fn(model)  # list of per-task accs
+            test_accs_seen = [acc * 100 for acc in test_accs_seen]
             test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         history["stage"].append("AE")
@@ -709,6 +712,10 @@ def train_2_stage_class_aware(
                 # student logits restricted to SEEN columns (old+new)
                 z_student_seen = logits[old_mask][:, seen_cols]  # [B_old, K_seen]
                 logit_reg = F.mse_loss(z_student_seen, z_teacher_phi)
+                # logit_reg = F.mse_loss( # apply on softmax (logits)
+                #     F.softmax(z_student_seen, dim=1),
+                #     F.softmax(z_teacher_phi, dim=1)
+                # )
 
 
             loss = lambda_ce * ce + lambda_logit * logit_reg
@@ -733,6 +740,7 @@ def train_2_stage_class_aware(
         test_acc_mean = None
         if eval_fn is not None:
             test_accs_seen = eval_fn(model)
+            test_accs_seen = [acc * 100 for acc in test_accs_seen]
             test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         history["stage"].append("Head")

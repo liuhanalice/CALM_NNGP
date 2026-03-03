@@ -231,7 +231,7 @@ def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
         "test_acc_mean",
         "test_accs_seen",
         "test_rec_loss",
-    ] + [f"acc_task{i}" for i in range(len(tasks))]
+    ]
 
     if not os.path.exists(path):
         with open(path, "w", newline="") as f:
@@ -391,7 +391,7 @@ def make_recovered_dataset(images, labels):
 
 
 def plot_acc_over_all_tasks(
-    histories_per_task,
+    histories_per_task, # list (by task) of dictionary
     epochs_per_task,
     title="Training & Testing Accuracy over Global Epochs",
     save_path=None
@@ -399,7 +399,7 @@ def plot_acc_over_all_tasks(
     num_tasks = len(histories_per_task)
     colors = plt.cm.tab20.colors  # 20 distinct colors
 
-    # global offsets per task block
+    # global offsets per task block (will be the starting epoch index for each task's training curve)
     offsets = [0]
     for e in epochs_per_task[:-1]:
         offsets.append(offsets[-1] + e)
@@ -408,35 +408,46 @@ def plot_acc_over_all_tasks(
     global_last_epoch = 0
 
     # --- 1) plot per-task training acc (only for the task being trained) ---
-    for t, hist in enumerate(histories_per_task):
-        color = colors[t % len(colors)]
+    for t, hist in enumerate(histories_per_task): # t starts from 0!
+        #color = colors[t % len(colors)]
         start = offsets[t]
         T = len(hist.get("train_acc", []))
         x = [start + i + 1 for i in range(T)]
-        plt.plot(x, hist["train_acc"], color=color, linestyle="-", linewidth=2, label=f"Task {t} train")
+        plt.plot(x, hist["train_acc"], linestyle="-", linewidth=2, label=f"Task {t} train")
         global_last_epoch = max(global_last_epoch, start + T)
 
-    # --- 2) plot per-task test acc for ALL seen tasks at each epoch ---
-    # We'll reconstruct test curves for each task k by scanning through training histories.
-    # For a fixed k, it has values starting from when k becomes "seen" (training task >= k).
+   # --- 2) plot per-task test acc for ALL seen tasks at each epoch ---
+# Build curves per task k by iterating (task t, epoch ep) and appending accs_seen[k].
     max_tasks = len(histories_per_task)
+    xs = [[] for _ in range(max_tasks)]
+    ys = [[] for _ in range(max_tasks)]
 
-    for k in range(max_tasks):
-        color = colors[k % len(colors)]
-        xs_k, ys_k = [], []
-        for t, hist in enumerate(histories_per_task):
-            if "test_accs_seen" not in hist:
+    for t, hist in enumerate(histories_per_task):
+        if "test_accs_seen" not in hist:
+            continue
+
+        start = offsets[t]
+        test_list = hist["test_accs_seen"]  # list over epochs; each entry is length (t+1)
+
+        for ep_idx, accs_seen in enumerate(test_list):
+            if accs_seen is None:
                 continue
-            start = offsets[t]
-            test_list = hist["test_accs_seen"]  # list over epochs; each entry list over seen tasks
-            for ep_idx, accs_seen in enumerate(test_list):
-                if accs_seen is None:
-                    continue
-                if k < len(accs_seen):
-                    xs_k.append(start + ep_idx + 1)
-                    ys_k.append(accs_seen[k])
-        if len(xs_k) > 0:
-            plt.plot(xs_k, ys_k, linestyle="--", color=color, linewidth=2,label=f"Task {k} test")
+
+            # Optional safety check
+            # if len(accs_seen) != t + 1:
+            #     raise ValueError(f"Task {t} epoch {ep_idx}: expected len {t+1}, got {len(accs_seen)}")
+
+            xg = start + ep_idx + 1
+            for k, acc_k in enumerate(accs_seen):  # k = 0..t
+                xs[k].append(xg)
+                ys[k].append(acc_k)
+
+    # Now plot each task-k test curve
+    for k in range(max_tasks):
+        if len(xs[k]) == 0:
+            continue
+        # color = colors[k % len(colors)]
+        plt.plot(xs[k], ys[k], linestyle="--", linewidth=2, label=f"Task {k} test")
 
     plt.xlabel("Global Epoch Index")
     plt.ylabel("Accuracy (%)")
@@ -635,12 +646,16 @@ def main():
     parser.add_argument("--GP_train_otc_size", type=int, default=50)
     parser.add_argument("--GP_num_indcpts", type=int, default=1000)
     parser.add_argument("--GP_package", type=str, default="gplite")
+    parser.add_argument("--skip_GP", action="store_true", help="Whether to skip the GP training R script after each task.") # for experiments convenience;
+    parser.add_argument("--ce_onall", action="store_true", help="Whether to compute CE loss on all seen tasks' data (instead of just current task) during training.") # for experiments convenience;
 
     args = parser.parse_args()
 
     set_seed(args.seed)
     device = get_device()
     print(f"Device: {device}; f_size={args.f_size}")
+
+    skip_GP = args.skip_GP
 
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
     tasks = [[0,1,2,3,4],[5],[6],[7],[8],[9]]
@@ -743,6 +758,8 @@ def main():
         # else:
         #     logit_mask = None
         
+
+
         history = train_2_stage_class_aware(
             model=model,
             teacher_model=teacher_model,
@@ -762,7 +779,7 @@ def main():
             lr_stage2=args.lr_head,
             lambda_ce=1.0,
             lambda_logit=(0.0 if t == 0 else args.lambda_logit),
-            ce_on="new",                  # CE only on new samples
+            ce_on="all" if args.ce_onall else "new",                  # CE only on new samples or all seen samples
             phi_fill="mean",       
 
             # -------- Common --------
@@ -869,29 +886,38 @@ def main():
         if not args.no_checkpoint:
             save_checkpoint(ck_dir, t, model)
 
-        # Run Rscript and reconstruct R inducing points as "buffer" for next task
-        print(f"[Task {t}] Running Rscript to produce: {task_dir}/inducing_points.csv")
-        r_args = [
-            "--n_tr", str(args.GP_train_size_per_class),
-            "--n_ts", str(args.GP_test_size_per_class),
-            "--n_octr", str(args.GP_train_otc_size),
-            "--n_indcpts", str(args.GP_num_indcpts),
-            "--GP_package", args.GP_package,
-            "--save_path", str(task_dir),
-            "--data_tr", str(data_tr_path),
-            "--data_ts", str(data_ts_path),
-            "--last_class", str(last_digits[t]),
-        ]
+        if skip_GP:
+            print(f"[Task {t}] Skipping GP training and Rscript execution as per --skip_GP flag.")
+            # prepare inducing_points.csv with just the original training features for next task (no GP selection)
+            df_trGP = pd.read_csv(data_tr_path)
+            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * (t+1), len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_tasks_seen)
+            df_trGP = df_trGP.iloc[:, list(range(args.f_size)) + [-1]]  # only first f_size columns  + label column (assumes label is last column), skip whaterver in middle
+            df_trGP.to_csv(os.path.join(task_dir, "inducing_points.csv"), index=False)
         
-        if platform.system() == "Windows":
-            run_rscript_and_wait(
-                rscript_path=Path.cwd() / args.rscript_path,
-                r_args_str=r_args,
-                cwd=Path.cwd(),
-                r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",  # <-- Windows override
-            )
         else:
-            run_rscript_and_wait(args.rscript_path, r_args_str=r_args, cwd=None)
+            # Run Rscript and reconstruct R inducing points as "buffer" for next task
+            print(f"[Task {t}] Running Rscript to produce: {task_dir}/inducing_points.csv")
+            r_args = [
+                "--n_tr", str(args.GP_train_size_per_class),
+                "--n_ts", str(args.GP_test_size_per_class),
+                "--n_octr", str(args.GP_train_otc_size),
+                "--n_indcpts", str(args.GP_num_indcpts),
+                "--GP_package", args.GP_package,
+                "--save_path", str(task_dir),
+                "--data_tr", str(data_tr_path),
+                "--data_ts", str(data_ts_path),
+                "--last_class", str(last_digits[t]),
+            ]
+            
+            if platform.system() == "Windows":
+                run_rscript_and_wait(
+                    rscript_path=Path.cwd() / args.rscript_path,
+                    r_args_str=r_args,
+                    cwd=Path.cwd(),
+                    r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",  # <-- Windows override
+                )
+            else:
+                run_rscript_and_wait(args.rscript_path, r_args_str=r_args, cwd=None)
 
         R_inducing_path = os.path.join(task_dir, "inducing_points.csv")
         if not os.path.exists(R_inducing_path):
@@ -905,7 +931,7 @@ def main():
             )
             print(f"[Task {t}] Loaded from R CSV: {feats_csv.shape[0]} rows, f_size={feats_csv.shape[1]}")
 
-            # Decode to images with your AE decoder
+            # Decode to images with AE decoder
             recovered_imgs = decode_features_to_images(
                 model, feats_csv, batch_size=128, clamp_range=(0.0, 1.0), device=device
             )
@@ -957,19 +983,20 @@ def main():
         save_path=os.path.join(run_dir, "acc_over_time_head_only.png")
     )
 
-    # Plot GP metrics
-    plotGP_per_class_metrics_over_tasks(
-        run_dir=run_dir,
-        task_ids=list(range(len(tasks))),
-        metrics=("accuracy", "precision", "recall", "f1"),
-        save_path=os.path.join(run_dir, "gp_per_class_metrics.png")
-    )
+    if not skip_GP:
+        # Plot GP metrics
+        plotGP_per_class_metrics_over_tasks(
+            run_dir=run_dir,
+            task_ids=list(range(len(tasks))),
+            metrics=("accuracy", "precision", "recall", "f1"),
+            save_path=os.path.join(run_dir, "gp_per_class_metrics.png")
+        )
 
-    plotGP_total_accuracy_over_tasks(
-        run_dir=run_dir,
-        task_ids=list(range(len(tasks))),
-        save_path=os.path.join(run_dir, "gp_total_accuracy.png")
-    )
+        plotGP_total_accuracy_over_tasks(
+            run_dir=run_dir,
+            task_ids=list(range(len(tasks))),
+            save_path=os.path.join(run_dir, "gp_total_accuracy.png")
+        )
 
 
 if __name__ == "__main__":

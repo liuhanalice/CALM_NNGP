@@ -7,8 +7,8 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --mem-per-gpu=16GB
-#SBATCH --time=12:00:00
+#SBATCH --mem-per-gpu=8GB
+#SBATCH --time=6:00:00
 #SBATCH --output=/home/lhalice/CALM_NNGP/jobs/logs/launch_%j.log
 
 module purge
@@ -20,7 +20,7 @@ source /home/lhalice/miniconda3/etc/profile.d/conda.sh
 conda activate NNGP
 
 # Debug
-eacho "=== Python ==="
+echo "=== Python ==="
 which python
 python -V
 python -c "import sys; print('python:', sys.executable)"
@@ -35,4 +35,4 @@ which R
 R --version
 
 # Run the script
-python -u CL_Driver.py --no_checkpoint --log_every_epoch --epochs0=60 --epochs=120 --lambda_rec=1.0 --GP_train_size_per_class=2000 --GP_test_size_per_class=1000 --GP_train_otc_size=50 --GP_num_indcpts=1000 --GP_package=laGP
+python -u CL_Driver.py --no_checkpoint --log_every_epoch --epochs0=60 --epochs=120 --lambda_rec=1.0 --GP_train_size_per_class=2000 --GP_test_size_per_class=1000 --GP_train_otc_size=50 --GP_num_indcpts=1000 --GP_package=laGP --skip_GP --lambda_logit=3

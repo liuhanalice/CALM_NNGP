@@ -562,11 +562,13 @@ def train_2_stage_class_aware(
     new_set = set(new_classes)
 
     old_cols = sorted(old_classes)                       # columns in teacher/student corresponding to old classes
-    seen_cols = sorted(list(old_set.union(new_set)))     # columns corresponding to all seen classes (old + current new)
+    new_only = [c for c in sorted(new_classes) if c not in old_set]
+    seen_cols = old_cols + new_only
     K_prev = len(old_cols)
     K_seen = len(seen_cols)
 
     # map global class id -> position in old_cols
+    seen_pos = {c: i for i, c in enumerate(seen_cols)}
     old_pos = {c: i for i, c in enumerate(old_cols)}
 
     history = {
@@ -687,21 +689,12 @@ def train_2_stage_class_aware(
             opt2.zero_grad()
             logits, recon, feat = model(x)
 
-            # ---------------- Cross-Entropy ----------------
-            ce = torch.tensor(0.0, device=device)
-
-            if lambda_ce > 0:
-                if ce_on == "all":
-                    ce = F.cross_entropy(logits, y)
-                elif ce_on == "new" and new_mask.any():
-                    ce = F.cross_entropy(logits[new_mask], y[new_mask])
-
+           
             # ---------------- Logit Preservation ----------------
             logit_reg = torch.tensor(0.0, device=device)
 
             if lambda_logit > 0 and old_mask.any() and K_prev > 0:
                 x_old = x[old_mask]
-                y_old = y[old_mask]
 
                 with torch.no_grad():
                     z_teacher_full, _, _ = teacher_model(x_old)
@@ -716,6 +709,36 @@ def train_2_stage_class_aware(
                 #     F.softmax(z_student_seen, dim=1),
                 #     F.softmax(z_teacher_phi, dim=1)
                 # )
+            
+             # ---------------- Cross-Entropy ----------------
+            ce = torch.tensor(0.0, device=device)
+
+            if lambda_ce > 0:
+                ce_new = torch.tensor(0.0, device=device)
+                ce_old = torch.tensor(0.0, device=device)
+
+                # New Classse: CE over seen cols
+                if new_mask.any():
+                    logits_new = logits[new_mask][:, seen_cols]           # [B_new, K_seen]
+                    y_new = y[new_mask]
+                    y_new_mapped = torch.tensor([seen_pos[int(yy)] for yy in y_new.tolist()],
+                                                device=device, dtype=torch.long)
+                    ce_new = F.cross_entropy(logits_new, y_new_mapped)
+
+                # Two CE Options:
+                if ce_on == "all":
+                    # OLD Classes: 
+                    if old_mask.any():
+                        logits_old = logits[old_mask][:, old_cols]         # [B_old, K_prev] only on old columns
+                        y_old = y[old_mask]
+                        y_old_mapped = torch.tensor([old_pos[int(yy)] for yy in y_old.tolist()],
+                                                    device=device, dtype=torch.long)
+                        ce_old = F.cross_entropy(logits_old, y_old_mapped)
+
+                    ce = ce_new + ce_old
+
+                elif ce_on == "new":
+                    ce = ce_new
 
 
             loss = lambda_ce * ce + lambda_logit * logit_reg

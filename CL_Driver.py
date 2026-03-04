@@ -391,34 +391,56 @@ def make_recovered_dataset(images, labels):
 
 
 def plot_acc_over_all_tasks(
-    histories_per_task, # list (by task) of dictionary
+    histories_per_task,
     epochs_per_task,
-    title="Training & Testing Accuracy over Global Epochs",
-    save_path=None
+    title_prefix="Accuracy over Global Epochs",
+    save_path_prefix=None
 ):
     num_tasks = len(histories_per_task)
-    colors = plt.cm.tab20.colors  # 20 distinct colors
 
-    # global offsets per task block (will be the starting epoch index for each task's training curve)
+    # ----- Compute global offsets -----
     offsets = [0]
     for e in epochs_per_task[:-1]:
         offsets.append(offsets[-1] + e)
 
-    plt.figure(figsize=(10, 5))
-    global_last_epoch = 0
+    global_last_epoch = sum(epochs_per_task)
 
-    # --- 1) plot per-task training acc (only for the task being trained) ---
-    for t, hist in enumerate(histories_per_task): # t starts from 0!
-        #color = colors[t % len(colors)]
+    # ==========================================================
+    # TRAINING FIGURE
+    # ==========================================================
+    plt.figure(figsize=(10, 5))
+
+    for t, hist in enumerate(histories_per_task):
         start = offsets[t]
         T = len(hist.get("train_acc", []))
         x = [start + i + 1 for i in range(T)]
-        plt.plot(x, hist["train_acc"], linestyle="-", linewidth=2, label=f"Task {t} train")
-        global_last_epoch = max(global_last_epoch, start + T)
+        plt.plot(
+            x,
+            hist["train_acc"],
+            linestyle="-",
+            linewidth=2,
+            label=f"Task {t}"
+        )
 
-   # --- 2) plot per-task test acc for ALL seen tasks at each epoch ---
-# Build curves per task k by iterating (task t, epoch ep) and appending accs_seen[k].
-    max_tasks = len(histories_per_task)
+    plt.xlabel("Global Epoch Index")
+    plt.ylabel("Training Accuracy (%)")
+    plt.title(f"{title_prefix} (Training)")
+    plt.xlim(0, global_last_epoch + 1)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=9, ncol=2, frameon=False)
+
+    if save_path_prefix is not None:
+        plt.savefig(f"{save_path_prefix}_train.png", bbox_inches="tight", dpi=300)
+    else:
+        plt.show()
+
+
+    # ==========================================================
+    # TEST FIGURE
+    # ==========================================================
+    plt.figure(figsize=(10, 5))
+
+    max_tasks = num_tasks
     xs = [[] for _ in range(max_tasks)]
     ys = [[] for _ in range(max_tasks)]
 
@@ -427,38 +449,40 @@ def plot_acc_over_all_tasks(
             continue
 
         start = offsets[t]
-        test_list = hist["test_accs_seen"]  # list over epochs; each entry is length (t+1)
+        test_list = hist["test_accs_seen"]
 
         for ep_idx, accs_seen in enumerate(test_list):
             if accs_seen is None:
                 continue
 
-            # Optional safety check
-            # if len(accs_seen) != t + 1:
-            #     raise ValueError(f"Task {t} epoch {ep_idx}: expected len {t+1}, got {len(accs_seen)}")
-
             xg = start + ep_idx + 1
-            for k, acc_k in enumerate(accs_seen):  # k = 0..t
+            for k, acc_k in enumerate(accs_seen):
                 xs[k].append(xg)
                 ys[k].append(acc_k)
 
-    # Now plot each task-k test curve
     for k in range(max_tasks):
         if len(xs[k]) == 0:
             continue
-        # color = colors[k % len(colors)]
-        plt.plot(xs[k], ys[k], linestyle="--", linewidth=2, label=f"Task {k} test")
+
+        plt.plot(
+            xs[k],
+            ys[k],
+            linestyle="--",
+            linewidth=2,
+            label=f"Task {k}"
+        )
 
     plt.xlabel("Global Epoch Index")
-    plt.ylabel("Accuracy (%)")
-    plt.title(title)
+    plt.ylabel("Test Accuracy (%)")
+    plt.title(f"{title_prefix} (Test)")
     plt.xlim(0, global_last_epoch + 1)
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=9, ncol=2, frameon=False)
 
-    if save_path is not None:
-        plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
+    if save_path_prefix is not None:
+        plt.savefig(f"{save_path_prefix}_test.png", bbox_inches="tight", dpi=300)
+    else:
+        plt.show()
 
 
 
@@ -816,7 +840,7 @@ def main():
             out_dir=task_dir,
             f_size=args.f_size,
             num_classes=10,
-            save_as="softmax",
+            save_as="logits", #FIXME: change it to softmax later
             keep_frac=0.95 #NOTE: keep top 95% confident samples per class (for GP training)
         )
         print(f"[Task {t}] Wrote CSVs to: {task_dir}")
@@ -979,8 +1003,8 @@ def main():
     plot_acc_over_all_tasks(
         histories_per_task=head_histories_per_task,
         epochs_per_task=epochs_head_per_task,
-        title="MNIST Continual: NN (Head) Accuracy vs Global Epochs",
-        save_path=os.path.join(run_dir, "acc_over_time_head_only.png")
+        title_prefix="MNIST Continual: NN (Head) Accuracy vs Global Epochs",
+        save_path_prefix=os.path.join(run_dir, "acc_over_time_head_only.png")
     )
 
     if not skip_GP:

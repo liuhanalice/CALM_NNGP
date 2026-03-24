@@ -201,13 +201,13 @@ def plot_z_histograms_by_label(
 
 if __name__ == "__main__":
     # root dir
-    run_dir="./runs_mnist_continual/run_20260303_154209"
+    run_dir="./runs_mnist_continual/run_20260323_140659"
 
     # Training and Test NN(Head) Accuracy vs. Global epochs
-    csv_path = Path(run_dir) / "metrics.csv"
-    acc_plot_savepath = Path(run_dir) / "CL.png"
-    history_dict, epochs_per_task = read_metrics_csv(csv_path)
-    plot_acc_over_all_tasks(history_dict, epochs_per_task, save_path_prefix=acc_plot_savepath)
+    # csv_path = Path(run_dir) / "metrics.csv"
+    # acc_plot_savepath_prefic = Path(run_dir) / "CL"
+    # history_dict, epochs_per_task = read_metrics_csv(csv_path)
+    # plot_acc_over_all_tasks(history_dict, epochs_per_task, save_path_prefix=acc_plot_savepath_prefic)
 
     # Logit Histogram
     for i in range(6):

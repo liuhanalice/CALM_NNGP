@@ -482,6 +482,7 @@ def train_2_stage_class_aware(
     trloader,
     old_classes,            # iterable of ints (classes seen before task t)
     new_classes,            # iterable of ints (classes introduced at task t)
+    # last_task_new_classes,      # iterable of ints (classes seen at task t-1), to peform extension map #TODO:
     # stage 1
     epochs_stage1=3,
     lr_stage1=1e-3,
@@ -557,19 +558,11 @@ def train_2_stage_class_aware(
 
     old_classes = list(map(int, old_classes))
     new_classes = list(map(int, new_classes))
+    # last_task_new_classes = list(map(int, last_task_new_classes))
 
     old_set = set(old_classes)
     new_set = set(new_classes)
 
-    old_cols = sorted(old_classes)                       # columns in teacher/student corresponding to old classes
-    new_only = [c for c in sorted(new_classes) if c not in old_set]
-    seen_cols = old_cols + new_only
-    K_prev = len(old_cols)
-    K_seen = len(seen_cols)
-
-    # map global class id -> position in old_cols
-    seen_pos = {c: i for i, c in enumerate(seen_cols)}
-    old_pos = {c: i for i, c in enumerate(old_cols)}
 
     history = {
         "stage": [],
@@ -691,24 +684,28 @@ def train_2_stage_class_aware(
 
            
             # ---------------- Logit Preservation ----------------
+            #TODO: should extend during training?
             logit_reg = torch.tensor(0.0, device=device)
 
-            if lambda_logit > 0 and old_mask.any() and K_prev > 0:
+            if lambda_logit > 0 and old_mask.any():
                 x_old = x[old_mask]
 
                 with torch.no_grad():
                     z_teacher_full, _, _ = teacher_model(x_old)
                 
-                z_teacher_old = z_teacher_full[:, old_cols]
-                z_teacher_phi = phi_extend(z_teacher_old, Kt=K_seen, fill=phi_fill)
+            #     z_teacher_old = z_teacher_full[:, old_cols]
+            #     z_teacher_phi = phi_extend(z_teacher_old, Kt=K_seen, fill=phi_fill)
 
-                # student logits restricted to SEEN columns (old+new)
-                z_student_seen = logits[old_mask][:, seen_cols]  # [B_old, K_seen]
-                logit_reg = F.mse_loss(z_student_seen, z_teacher_phi)
-                # logit_reg = F.mse_loss( # apply on softmax (logits)
-                #     F.softmax(z_student_seen, dim=1),
-                #     F.softmax(z_teacher_phi, dim=1)
-                # )
+            #     # student logits restricted to SEEN columns (old+new)
+            #     z_student_seen = logits[old_mask][:, seen_cols]  # [B_old, K_seen]
+            #     logit_reg = F.mse_loss(z_student_seen, z_teacher_phi)
+            #     # logit_reg = F.mse_loss( # apply on softmax (logits)
+            #     #     F.softmax(z_student_seen, dim=1),
+            #     #     F.softmax(z_teacher_phi, dim=1)
+            #     # )
+                
+                logit_reg = F.mse_loss(logits[old_mask], z_teacher_full)
+                
             
              # ---------------- Cross-Entropy ----------------
             ce = torch.tensor(0.0, device=device)
@@ -719,21 +716,19 @@ def train_2_stage_class_aware(
 
                 # New Classse: CE over seen cols
                 if new_mask.any():
-                    logits_new = logits[new_mask][:, seen_cols]           # [B_new, K_seen]
+                    logits_new = logits[new_mask]
                     y_new = y[new_mask]
-                    y_new_mapped = torch.tensor([seen_pos[int(yy)] for yy in y_new.tolist()],
-                                                device=device, dtype=torch.long)
-                    ce_new = F.cross_entropy(logits_new, y_new_mapped)
+                    
+                    ce_new = F.cross_entropy(logits_new, y_new)
 
                 # Two CE Options:
                 if ce_on == "all":
                     # OLD Classes: 
                     if old_mask.any():
-                        logits_old = logits[old_mask][:, old_cols]         # [B_old, K_prev] only on old columns
+                        logits_old = logits[old_mask] 
                         y_old = y[old_mask]
-                        y_old_mapped = torch.tensor([old_pos[int(yy)] for yy in y_old.tolist()],
-                                                    device=device, dtype=torch.long)
-                        ce_old = F.cross_entropy(logits_old, y_old_mapped)
+                
+                        ce_old = F.cross_entropy(logits_old, y_old)
 
                     ce = ce_new + ce_old
 

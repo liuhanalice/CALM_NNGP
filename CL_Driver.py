@@ -914,7 +914,7 @@ def main():
             print(f"[Task {t}] Skipping GP training and Rscript execution as per --skip_GP flag.")
             # prepare inducing_points.csv with just the original training features for next task (no GP selection)
             df_trGP = pd.read_csv(data_tr_path)
-            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * (t+1), len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_tasks_seen)
+            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * (last_digits[t]+1), len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_tasks_seen)
             df_trGP = df_trGP.iloc[:, list(range(args.f_size)) + [-1]]  # only first f_size columns  + label column (assumes label is last column), skip whaterver in middle
             df_trGP.to_csv(os.path.join(task_dir, "inducing_points.csv"), index=False)
         
@@ -999,12 +999,11 @@ def main():
 
 
     # Below is for 2-stage train, head-only (not include AE) accuracy plot
-    #FIXME: Not show test and not show previous tasks
     plot_acc_over_all_tasks(
         histories_per_task=head_histories_per_task,
         epochs_per_task=epochs_head_per_task,
         title_prefix="MNIST Continual: NN (Head) Accuracy vs Global Epochs",
-        save_path_prefix=os.path.join(run_dir, "acc_over_time_head_only.png")
+        save_path_prefix=os.path.join(run_dir, "acc_over_time_head_only")
     )
 
     if not skip_GP:

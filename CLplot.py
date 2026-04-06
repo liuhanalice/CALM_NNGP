@@ -201,7 +201,7 @@ def plot_z_histograms_by_label(
 
 if __name__ == "__main__":
     # root dir
-    run_dir="./runs_mnist_continual/run_20260323_140659"
+    run_dir="./runs_mnist_continual/run_20260324_234303"
 
     # Training and Test NN(Head) Accuracy vs. Global epochs
     # csv_path = Path(run_dir) / "metrics.csv"

@@ -412,7 +412,7 @@ def train_2_stage(
         if eval_fn is not None:
             test_accs_seen = eval_fn(model) # list of per-task accs
             test_accs_seen = [acc * 100 for acc in test_accs_seen]
-            est_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+            test_acc_mean  = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
 
         n_batches = max(len(trloader), 1)
         epoch_loss  = total_loss / n_batches

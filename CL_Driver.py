@@ -734,7 +734,9 @@ def main():
         print("="*80)
 
         # Train
-        epochs = args.epochs0 if t == 0 else (args.epochs)*t  # train more epochs as tasks coming
+        # epochs = args.epochs0 if t == 0 else (args.epochs)*t  # train more epochs as tasks coming
+        epochs = args.epochs0 if t == 0 else args.epochs  # train more epochs as tasks coming
+
         start_time = time.time()
         
         seen_test_loaders.append(test_loaders[t])
@@ -796,7 +798,7 @@ def main():
             lr_stage1=args.lr_AE,
             lambda_rec=args.lambda_rec,
             lambda_feat=(0.0 if t == 0 else args.lambda_feat),
-            rec_on="new",                 # recon only on NEW-class samples
+            rec_on="all",                 #Fixed
 
             # -------- Stage 2 (Head) --------
             epochs_stage2=epochs,
@@ -840,7 +842,7 @@ def main():
             out_dir=task_dir,
             f_size=args.f_size,
             num_classes=10,
-            save_as="logits", #FIXME: change it to softmax later
+            save_as="softmax", #FIXME: change it to softmax later
             keep_frac=0.95 #NOTE: keep top 95% confident samples per class (for GP training)
         )
         print(f"[Task {t}] Wrote CSVs to: {task_dir}")

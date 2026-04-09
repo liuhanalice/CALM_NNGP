@@ -1,4 +1,6 @@
 # run_continual_mnist_driver.py
+from asyncio import tasks
+from asyncio import tasks
 import os
 import csv
 import json
@@ -682,9 +684,9 @@ def main():
     skip_GP = args.skip_GP
 
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
-    tasks = [[0,1,2,3,4],[5],[6],[7],[8],[9]]
-    last_digits = [4,5,6,7,8,9]
-    train_size = [15000,3000,3000,3000,3000,3000]
+    tasks = [[0,1],[2,3],[4,5],[6,7]]
+    seen_classes_per_task = [sorted(sum(tasks[:t+1], [])) for t in range(len(tasks))]
+    train_size = [15000,6000,6000,6000] #NOTE: Match number of tasks
     # tasks = [[0,1,2,3,4,5,6,7,8], [9]]
 
     # Output dirs
@@ -916,7 +918,8 @@ def main():
             print(f"[Task {t}] Skipping GP training and Rscript execution as per --skip_GP flag.")
             # prepare inducing_points.csv with just the original training features for next task (no GP selection)
             df_trGP = pd.read_csv(data_tr_path)
-            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * (last_digits[t]+1), len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_tasks_seen)
+            n_seen = len(seen_classes_per_task[t])
+            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * n_seen, len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_seen_classes)
             df_trGP = df_trGP.iloc[:, list(range(args.f_size)) + [-1]]  # only first f_size columns  + label column (assumes label is last column), skip whaterver in middle
             df_trGP.to_csv(os.path.join(task_dir, "inducing_points.csv"), index=False)
         
@@ -932,7 +935,7 @@ def main():
                 "--save_path", str(task_dir),
                 "--data_tr", str(data_tr_path),
                 "--data_ts", str(data_ts_path),
-                "--last_class", str(last_digits[t]),
+                "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
             ]
             
             if platform.system() == "Windows":

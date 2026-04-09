@@ -33,8 +33,8 @@ option_list <- list(
               help = "The path to testing dataset"),
   make_option(c("--n_indcpts"), type = "numeric", default = 1000,
               help = "Number of inducing points [default: %default]"),
-  make_option(c("--last_class"), type = "numeric", default = 4,
-              help = "Existing classes are 0-last_class, train GP models for digit 0-last_class [default: %default]"),
+ make_option(c("--existing_classes"), type = "character", default = "0,1,2,3,4",
+            help = "Comma-separated list of existing class labels [default: %default]"),
   make_option(c("--use_Y_logspace"), type = "logical", default = FALSE,
             help = "Whether to apply log-space transform to Y values (TRUE or FALSE) [default: %default]"),
   make_option(c("--GP_package"), type = "character", default = "gplite",
@@ -77,7 +77,7 @@ mse_train <- list()
 
 is_test <- FALSE
 
-existingclass_set <- as.list(0:args$last_class)
+existingclass_set <- as.list(as.numeric(strsplit(args$existing_classes, ",")[[1]]))
 
 if (is_test) {
   load(paste0(args$save_path, "/GPmodel_train.RData"))
@@ -123,15 +123,15 @@ if (is_test) {
 
 
     all_data_X[[key]] <- current_data[, 1:f]
-    all_data_Y[[key]] <- current_data[, (f + j), drop = FALSE]
+    all_data_Y[[key]] <- current_data[, (f + label + 1), drop = FALSE]
     
     val_data_X[[key]] <- current_data_val[, 1:f]
-    val_data_Y[[key]] <- current_data_val[, (f + j), drop = FALSE]
+    val_data_Y[[key]] <- current_data_val[, (f + label + 1), drop = FALSE]
 
     X <- rbind(all_data_X[[key]], sampled_other[, 1:f])
-    Y <- rbind(all_data_Y[[key]], sampled_other[, (f + j), drop = FALSE])
+    Y <- rbind(all_data_Y[[key]], sampled_other[, (f + label + 1), drop = FALSE])
     val.X <- rbind(val_data_X[[key]], sampled_other_val[, 1:f])
-    val.Y <- rbind(val_data_Y[[key]], sampled_other_val[, (f + j), drop = FALSE])
+    val.Y <- rbind(val_data_Y[[key]], sampled_other_val[, (f + label + 1), drop = FALSE])
 
     print(paste0("class ", label, " training sample size (indclude ", nrow(sampled_other)," samples from other classes): ", nrow(X)))
     print(paste0("class ", label, " validation set sample size (indclude ", nrow(sampled_other_val)," samples from other classes): ", nrow(val.X)))
@@ -139,11 +139,11 @@ if (is_test) {
     ### train_GP: bind target class and other classes ###
     # GPj <- train_GP(X=X, Y=Y, val.X=val.X, val.Y=val.Y, label=label, use_inducing = TRUE, num_inducing = num_inducing)
     if (GP_package == 'gplite') {
-      GPj <- train_GP_v3(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + j), drop = FALSE],
+      GPj <- train_GP_v3(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + label + 1), drop = FALSE],
                         val.X=val.X, val.Y=val.Y,
                         label=label, use_inducing = TRUE, num_inducing = num_inducing)
     } else if (GP_package == 'laGP') {
-      GPj <- train_GP_laGP(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + j), drop = FALSE],
+      GPj <- train_GP_laGP(X_t=all_data_X[[key]], X_otc=sampled_other[, 1:f], Y_t=all_data_Y[[key]], Y_otc=sampled_other[, (f + label + 1), drop = FALSE],
                         val.X=val.X, val.Y=val.Y,
                         label=label, use_inducing = TRUE, num_inducing = num_inducing)
     }
@@ -176,7 +176,7 @@ if (is_test) {
 
 #########  Test GP for existing classes #########
 test.df <- read.csv(args$data_ts)
-n_ts <- (args$n_ts) * (args$last_class + 1)
+n_ts <- (args$n_ts) * length(existingclass_set)
   print(paste0("Expected testing data total: ", n_ts))
 if (n_ts > nrow(test.df)) {
     print(paste0("n_ts is greater than the number of rows in the data frame, using all rows:", nrow(test.df)))
@@ -209,9 +209,14 @@ test_result_plots <- plot_GP_distributions(test_result$GP_test_mean_mat_with_lab
                     normal_plot_title="output distribution on different classes (testset)", normal_ymin=0, normal_ymax=0.1,
                     histogram_plot_title="histogram of predGPsep scores by class (testset)", histogram_ymin=0, histogram_ymax=600)
 
-#########  Save Structured Result #########
-save(file = paste0(args$save_path, "/GPmodel_train.RData"), GPmodel_train, GPresult_train, mse_train, train.df, val.df, all_data_X, all_data_Y, val_data_X, val_data_Y, test_data_X, test_data_Y, test_data_label)
-
-print("Save Results")
+if (! is_test) {
+  save(file = paste0(args$save_path, "/GPmodel_train.RData"),
+       GPmodel_train, GPresult_train, mse_train,
+       train.df, val.df,
+       all_data_X, all_data_Y, val_data_X, val_data_Y,
+       test_data_X, test_data_Y, test_data_label)
+  
+  print("Save Results")
+}
 dev.off()
 

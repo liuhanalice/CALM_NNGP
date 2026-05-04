@@ -157,7 +157,19 @@ if (is_test) {
 
     print(paste0("Current inducing_points dim: ", dim(inducing_points)[1], " x ", dim(inducing_points)[2]))
     print(GPj$plot)
-    gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
+    if (GP_package == 'gplite') {
+      gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
+      saveRDS(list(label = label, Z_t = GPj$inducing_points),
+              file = paste0(args$save_path, "/GPparams_", key, ".rds"))
+    } else if (GP_package == 'laGP') {
+      saveRDS(list(label = label,
+                   Z_t   = GPj$inducing_points,
+                   d     = GPj$d_fitted,
+                   g     = GPj$g_fitted,
+                   Y_Z_t = GPj$Y_Z_t),
+              file = paste0(args$save_path, "/GPparams_", key, ".rds"))
+    }
+    print(paste0("Saved GPparams_", key, ".rds"))
   }
   print("Train Finished")
   print("---------------------")

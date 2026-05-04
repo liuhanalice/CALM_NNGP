@@ -287,7 +287,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
 
   # laGP, not using inducing points, but sample some points to save as "inducing/sampling reference points"
   gp_model <- newGPsep(X=X, Z=Y, d = rep(10, ncol(X)), g = 1e-6, dK = TRUE)
-  mleGPsep(gp_model, param = "both") # tmin and tmax by default, see laGP reference
+  mle_out <- mleGPsep(gp_model, param = "both") # tmin and tmax by default, see laGP reference
 
   out <- predGPsep(gp_model, X)
   out.val <- predGPsep(gp_model, val.X)
@@ -308,6 +308,11 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   else { # return all training points
     inducing_points <- X_t
   }
+
+  # Predict full GP's posterior mean at inducing locations -> pseudo-targets.
+  # Lets GP_sample.R reconstruct a small GP on (Z_t, Y_Z_t) instead of full (X, Y).
+  Y_Z_t <- predGPsep(gp_model, inducing_points)$mean
+
   print(paste0("Selecting ", nrow(inducing_points), " inducing points"))
   mse <- norm(out.val$mean - val.Y, "2")
   print(paste0("validation MSE for class", label, ": ", mse))
@@ -320,7 +325,8 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
     xlab("Y_true") + ylab("Y_pred")
 
-  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points))
+  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points,
+              d_fitted = mle_out$d, g_fitted = mle_out$g, Y_Z_t = Y_Z_t))
 }
 
 

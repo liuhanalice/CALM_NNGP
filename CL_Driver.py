@@ -662,7 +662,9 @@ def main():
     parser.add_argument("--seed",      type=int, default=42)
     parser.add_argument("--no_checkpoint", action="store_true")
     parser.add_argument("--rscript_path", type=str, default="GP_train.R",
-                        help="Path to the R script to run (used if --run_rscript).")
+                        help="Path to the GP training R script.")
+    parser.add_argument("--rscript_sample_path", type=str, default="GP_sample.R",
+                        help="Path to the GP sampling R script.")
     parser.add_argument("--max_cache_items", type=int, default=None,
                         help="limit cached feature dict size (None = all)")
     parser.add_argument("--log_every_epoch", action="store_true",
@@ -672,10 +674,25 @@ def main():
     parser.add_argument("--GP_train_otc_size", type=int, default=50)
     parser.add_argument("--GP_num_indcpts", type=int, default=1000)
     parser.add_argument("--GP_package", type=str, default="gplite")
-    parser.add_argument("--skip_GP", action="store_true", help="Whether to skip the GP training R script after each task.") # for experiments convenience;
+    parser.add_argument("--GP_sigma_perturb", type=float, default=0.05,
+                        help="Perturbation noise std passed to GP_sample.R.")
+    parser.add_argument("--GP_n_cand_mult", type=int, default=10,
+                        help="Candidate multiplier passed to GP_sample.R (n_cand = n_indcpts * mult).")
+    parser.add_argument("--skip_GP", action="store_true",
+                        help="Skip all GP steps; use random feature subset as replay buffer.")
+    parser.add_argument("--skip_GP_train", action="store_true",
+                        help="Skip GP_train.R but still run GP_sample.R. Requires --gp_model_dir.")
+    parser.add_argument("--gp_model_dir", type=str, default=None,
+                        help="Path to a previous run directory whose task{t}/GPparams_*.rds files are reused when --skip_GP_train is set.")
     parser.add_argument("--ce_onall", action="store_true", help="Whether to compute CE loss on all seen tasks' data (instead of just current task) during training.") # for experiments convenience;
 
     args = parser.parse_args()
+
+    if args.skip_GP_train and not args.skip_GP:
+        if args.gp_model_dir is None:
+            raise ValueError("--gp_model_dir is required when --skip_GP_train is set.")
+        if not os.path.isdir(args.gp_model_dir):
+            raise FileNotFoundError(f"--gp_model_dir not found: {args.gp_model_dir}")
 
     set_seed(args.seed)
     device = get_device()
@@ -684,9 +701,9 @@ def main():
     skip_GP = args.skip_GP
 
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
-    tasks = [[0,1],[2,3],[4,5],[6,7]]
+    tasks = [[0,1,2,3,4],[6],[7],[8],[9]]
     seen_classes_per_task = [sorted(sum(tasks[:t+1], [])) for t in range(len(tasks))]
-    train_size = [15000,6000,6000,6000] #NOTE: Match number of tasks
+    train_size = [15000,3000,3000,3000, 3000] #NOTE: Match number of tasks
     # tasks = [[0,1,2,3,4,5,6,7,8], [9]]
 
     # Output dirs
@@ -914,49 +931,85 @@ def main():
         if not args.no_checkpoint:
             save_checkpoint(ck_dir, t, model)
 
+        # Shared args for both R scripts
+        r_args_common = [
+            "--n_indcpts",        str(args.GP_num_indcpts),
+            "--GP_package",       args.GP_package,
+            "--save_path",        str(task_dir),
+            "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
+        ]
+        r_args_sample = r_args_common + [
+            "--feature_size",  str(args.f_size),
+            "--sigma_perturb", str(args.GP_sigma_perturb),
+            "--n_cand_mult",   str(args.GP_n_cand_mult),
+            "--seed",          str(args.seed),
+        ]
+
         if skip_GP:
-            print(f"[Task {t}] Skipping GP training and Rscript execution as per --skip_GP flag.")
-            # prepare inducing_points.csv with just the original training features for next task (no GP selection)
+            # Skip all GP steps; write a random feature subset as replay_points.csv
+            print(f"[Task {t}] Skipping all GP steps (--skip_GP). Writing random replay_points.csv.")
             df_trGP = pd.read_csv(data_tr_path)
-            n_seen = len(seen_classes_per_task[t])
-            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * n_seen, len(df_trGP)), random_state=args.seed)  # random subset of train_feat.csv of size=GP_num_indcpts*(num_seen_classes)
-            df_trGP = df_trGP.iloc[:, list(range(args.f_size)) + [-1]]  # only first f_size columns  + label column (assumes label is last column), skip whaterver in middle
-            df_trGP.to_csv(os.path.join(task_dir, "inducing_points.csv"), index=False)
-        
+            n_seen  = len(seen_classes_per_task[t])
+            df_trGP = df_trGP.sample(n=min(args.GP_num_indcpts * n_seen, len(df_trGP)), random_state=args.seed)
+            df_trGP = df_trGP.iloc[:, list(range(args.f_size)) + [-1]]
+            df_trGP.to_csv(os.path.join(task_dir, "replay_points.csv"), index=False)
+
         else:
-            # Run Rscript and reconstruct R inducing points as "buffer" for next task
-            print(f"[Task {t}] Running Rscript to produce: {task_dir}/inducing_points.csv")
-            r_args = [
-                "--n_tr", str(args.GP_train_size_per_class),
-                "--n_ts", str(args.GP_test_size_per_class),
-                "--n_octr", str(args.GP_train_otc_size),
-                "--n_indcpts", str(args.GP_num_indcpts),
-                "--GP_package", args.GP_package,
-                "--save_path", str(task_dir),
-                "--data_tr", str(data_tr_path),
-                "--data_ts", str(data_ts_path),
-                "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
-            ]
-            
+            if not args.skip_GP_train:
+                # Run GP_train.R: fits GPs and saves GPparams_*.rds (+ GPmodel_*.rda for gplite)
+                print(f"[Task {t}] Running GP_train.R -> {task_dir}/GPparams_*.rds")
+                r_args_train = r_args_common + [
+                    "--n_tr",      str(args.GP_train_size_per_class),
+                    "--n_ts",      str(args.GP_test_size_per_class),
+                    "--n_octr",    str(args.GP_train_otc_size),
+                    "--data_tr",   str(data_tr_path),
+                    "--data_ts",   str(data_ts_path),
+                ]
+                if platform.system() == "Windows":
+                    run_rscript_and_wait(
+                        rscript_path=Path.cwd() / args.rscript_path,
+                        r_args_str=r_args_train,
+                        cwd=Path.cwd(),
+                        r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",
+                    )
+                else:
+                    run_rscript_and_wait(args.rscript_path, r_args_str=r_args_train, cwd=None)
+            else:
+                # Copy GPparams_*.rds (and GPmodel_*.rda for gplite) from the previous run
+                # into the current task_dir so GP_sample.R finds them at --save_path task_dir.
+                src_dir = os.path.join(args.gp_model_dir, f"task{t}")
+                if not os.path.isdir(src_dir):
+                    raise FileNotFoundError(f"Expected GP model dir not found: {src_dir}")
+                copied = 0
+                for fname in os.listdir(src_dir):
+                    if fname.startswith("GPparams_") or fname.startswith("GPmodel_"):
+                        shutil.copy(os.path.join(src_dir, fname), task_dir)
+                        copied += 1
+                if copied == 0:
+                    raise FileNotFoundError(f"No GPparams_*.rds / GPmodel_*.rda files found in {src_dir}")
+                print(f"[Task {t}] Copied {copied} GP model file(s) from {src_dir} -> {task_dir}")
+
+            # Run GP_sample.R: perturb inducing points, score with GP, write replay_points.csv
+            print(f"[Task {t}] Running GP_sample.R -> {task_dir}/replay_points.csv")
             if platform.system() == "Windows":
                 run_rscript_and_wait(
-                    rscript_path=Path.cwd() / args.rscript_path,
-                    r_args_str=r_args,
+                    rscript_path=Path.cwd() / args.rscript_sample_path,
+                    r_args_str=r_args_sample,
                     cwd=Path.cwd(),
-                    r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",  # <-- Windows override
+                    r_cmd=r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe",
                 )
             else:
-                run_rscript_and_wait(args.rscript_path, r_args_str=r_args, cwd=None)
+                run_rscript_and_wait(args.rscript_sample_path, r_args_str=r_args_sample, cwd=None)
 
-        R_inducing_path = os.path.join(task_dir, "inducing_points.csv")
-        if not os.path.exists(R_inducing_path):
-            raise FileNotFoundError(f"Expected R output CSV not found: {R_inducing_path}")
+        replay_path = os.path.join(task_dir, "replay_points.csv")
+        if not os.path.exists(replay_path):
+            raise FileNotFoundError(f"Expected replay CSV not found: {replay_path}")
         
         # --- Prepare for next task ---
         if t+1 < len(train_loaders):
             # Load features+labels back from CSV
             feats_csv, labels_csv = load_features_labels_from_Rcsv(
-                R_inducing_path, f_size=args.f_size, dtype=torch.float32, device=device
+                replay_path, f_size=args.f_size, dtype=torch.float32, device=device
             )
             print(f"[Task {t}] Loaded from R CSV: {feats_csv.shape[0]} rows, f_size={feats_csv.shape[1]}")
 

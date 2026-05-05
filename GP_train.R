@@ -105,10 +105,6 @@ if (is_test) {
   print(paste0("Using GP package: ", GP_package))
   print("======================================")
 
-  # Init inducing points and labels matrices
-  inducing_points <- matrix(NA, nrow = 0, ncol = f)
-  inducing_points_GTlabels <- matrix(NA, nrow = 0, ncol = 1)
-
   # Train GP models for each existing class
   print("---- Start Training GPs for existing classes ----")
   for (j in seq_along(existingclass_set)) { # j = 1,2,3,4, ...
@@ -151,11 +147,7 @@ if (is_test) {
     GPmodel_train[[key]] <- GPj$GPmodel
     GPresult_train[[key]] <- GPj$GPresult
     mse_train[[key]] <- GPj$mse
-    inducing_points <- rbind(inducing_points, GPj$inducing_points)
-    # assuming inducing points are all from the same class j [original points as inducing points]
-    inducing_points_GTlabels <- rbind(inducing_points_GTlabels, matrix(label, nrow = nrow(GPj$inducing_points), ncol = 1)) 
 
-    print(paste0("Current inducing_points dim: ", dim(inducing_points)[1], " x ", dim(inducing_points)[2]))
     print(GPj$plot)
     if (GP_package == 'gplite') {
       gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
@@ -170,17 +162,6 @@ if (is_test) {
     print(paste0("Saved GPparams_", key, ".rds"))
   }
   print("Train Finished")
-  print("---------------------")
-
-  # Save inducing points
-  # write.csv(inducing_points, file=paste0(args$save_path, "/inducing_points.csv"), row.names = FALSE)
-  ## Inducing points Label assignment ##
-  # option 1: build pred matrix
-  # indcpts_pred_mat <- build_inducing_pts_pred_matrix(inducing_points, GPmodel_train)
-  # option 2: save GT labels)
-  indcpts_pred_mat <- data.frame(inducing_points, label = inducing_points_GTlabels)
-  write.csv(indcpts_pred_mat, file=paste0(args$save_path, "/inducing_points.csv"), row.names = FALSE)
-  print("Inducing Points Saved")
   print("---------------------")
 }
 

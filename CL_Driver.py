@@ -978,10 +978,11 @@ def main():
                 print(f"[Task {t}] Copied {copied} GP model file(s) for old classes from {src_dir}")
 
             if not args.skip_GP_train:
-                # Train GP only for new classes introduced at this task
+                # Train GP only for new classes; test on all seen classes
                 print(f"[Task {t}] Running GP_train.R for new classes {new_classes_t} -> {task_dir}/GPparams_*.rds")
                 r_args_train = r_args_base + [
-                    "--existing_classes", ",".join(str(c) for c in new_classes_t),
+                    "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
+                    "--train_classes",    ",".join(str(c) for c in new_classes_t),
                     "--n_tr",      str(args.GP_train_size_per_class),
                     "--n_ts",      str(args.GP_test_size_per_class),
                     "--n_octr",    str(args.GP_train_otc_size),

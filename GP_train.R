@@ -34,7 +34,9 @@ option_list <- list(
   make_option(c("--n_indcpts"), type = "numeric", default = 1000,
               help = "Number of inducing points [default: %default]"),
  make_option(c("--existing_classes"), type = "character", default = "0,1,2,3,4",
-            help = "Comma-separated list of existing class labels [default: %default]"),
+            help = "Comma-separated list of ALL seen class labels (used for testing) [default: %default]"),
+  make_option(c("--train_classes"), type = "character", default = NULL,
+            help = "Comma-separated list of classes to train GP for (defaults to existing_classes) [default: %default]"),
   make_option(c("--use_Y_logspace"), type = "logical", default = FALSE,
             help = "Whether to apply log-space transform to Y values (TRUE or FALSE) [default: %default]"),
   make_option(c("--GP_package"), type = "character", default = "gplite",
@@ -78,6 +80,12 @@ mse_train <- list()
 is_test <- FALSE
 
 existingclass_set <- as.list(as.numeric(strsplit(args$existing_classes, ",")[[1]]))
+# Classes to train GP for (defaults to all existing classes if --train_classes not set)
+train_classes_set <- if (!is.null(args$train_classes)) {
+  as.list(as.numeric(strsplit(args$train_classes, ",")[[1]]))
+} else {
+  existingclass_set
+}
 
 if (is_test) {
   load(paste0(args$save_path, "/GPmodel_train.RData"))
@@ -105,10 +113,10 @@ if (is_test) {
   print(paste0("Using GP package: ", GP_package))
   print("======================================")
 
-  # Train GP models for each existing class
-  print("---- Start Training GPs for existing classes ----")
-  for (j in seq_along(existingclass_set)) { # j = 1,2,3,4, ...
-    label <- existingclass_set[[j]] # label = 0,1,2,3, ...
+  # Train GP models for new classes only
+  print(paste0("---- Start Training GPs for classes: ", paste(unlist(train_classes_set), collapse=","), " ----"))
+  for (j in seq_along(train_classes_set)) {
+    label <- train_classes_set[[j]]
     key <- paste0("c", label)
 
     sampled_other <- load_classes_other_than_label(train.df, label, existingclass_set, other_class_sample_num)
@@ -163,6 +171,35 @@ if (is_test) {
   }
   print("Train Finished")
   print("---------------------")
+
+  # Load GP models for old classes (copied from prev task) so testing covers all seen classes
+  old_labels <- setdiff(unlist(existingclass_set), unlist(train_classes_set))
+  for (label in old_labels) {
+    key <- paste0("c", label)
+    params_file <- paste0(args$save_path, "/GPparams_", key, ".rds")
+    if (!file.exists(params_file)) {
+      warning(paste0("GPparams not found for old class ", label, ": ", params_file))
+      next
+    }
+    params <- readRDS(params_file)
+    if (GP_package == "gplite") {
+      GPmodel_train[[key]] <- gp_load(paste0(args$save_path, "/GPmodel_", key, ".rda"))
+    } else if (GP_package == "laGP") {
+      da <- darg(list(mle = TRUE), params$Z_t)
+      ga <- tryCatch(
+        garg(list(mle = TRUE), matrix(params$Y_Z_t)),
+        error = function(e) list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
+      )
+      gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
+                           d = rep(da$start, ncol(params$Z_t)),
+                           g = ga$start, dK = TRUE)
+      mleGPsep(gp_model, param = "both",
+               tmin = c(da$min, ga$min),
+               tmax = c(da$max, ga$max))
+      GPmodel_train[[key]] <- gp_model
+    }
+    print(paste0("Loaded GP model for old class ", label))
+  }
 }
 
 #########  Test GP for existing classes #########

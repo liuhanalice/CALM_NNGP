@@ -287,7 +287,11 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
 
   # laGP, not using inducing points, but sample some points to save as "inducing/sampling reference points"
   gp_model <- newGPsep(X=X, Z=Y, d = rep(10, ncol(X)), g = 1e-6, dK = TRUE)
-  mle_out <- mleGPsep(gp_model, param = "both") # tmin and tmax by default, see laGP reference
+  # Split "both" into two explicit calls: mleGPsep(param="both") can return $d as a
+  # list of intermediate vectors (one per alternating step) rather than a length-p vector,
+  # causing length(d) != ncol(X) errors on reconstruction.
+  mle_d <- mleGPsep(gp_model, param = "d")
+  mle_g <- mleGPsep(gp_model, param = "g")
 
   out <- predGPsep(gp_model, X)
   out.val <- predGPsep(gp_model, val.X)
@@ -326,7 +330,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     xlab("Y_true") + ylab("Y_pred")
 
   return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points,
-              d_fitted = mle_out$d, g_fitted = mle_out$g, Y_Z_t = Y_Z_t))
+              d_fitted = as.numeric(mle_d$d), g_fitted = as.numeric(mle_g$g), Y_Z_t = Y_Z_t))
 }
 
 

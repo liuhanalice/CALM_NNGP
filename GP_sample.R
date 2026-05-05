@@ -80,7 +80,7 @@ for (j in seq_along(existing_classes)) {
     # full-GP posterior means at those locations as pseudo-targets.
     # Same fitted hyperparameters (d, g) -> same kernel shape, no re-fitting needed.
     gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
-                         d = params$d, g = params$g, dK = FALSE)
+                         d = as.numeric(params$d), g = as.numeric(params$g), dK = FALSE)
     Z_seed <- params$Z_t
 
   } else {

@@ -186,23 +186,21 @@ if (is_test) {
 
 #########  Test GP for existing classes #########
 test.df <- read.csv(args$data_ts)
-n_ts <- (args$n_ts) * length(existingclass_set)
-  print(paste0("Expected testing data total: ", n_ts))
-if (n_ts > nrow(test.df)) {
-    print(paste0("n_ts is greater than the number of rows in the data frame, using all rows:", nrow(test.df)))
-    n_ts <- nrow(test.df)
-}
-test.df <- test.df[1:n_ts, ]
-print(paste0("total test df size: ", nrow(test.df)))
-
-str(test.df$label)
-table(test.df$label)
 test.df$label <- as.numeric(as.character(test.df$label))
+print(paste0("total test df size: ", nrow(test.df)))
+print(paste0("n_ts per class: ", args$n_ts))
+table(test.df$label)
+
 for (j in seq_along(existingclass_set)) {
-  # label <- j - 1
   label <- existingclass_set[[j]]
   key <- paste0("c", label)
+  # Filter per class first, then cap to n_ts rows.
+  # Avoids the previous head-truncation bug where test.df[1:n_ts,] cut off
+  # later tasks whose rows appear after the first task's rows in the CSV.
   test_df <- test.df[test.df$label == label, ]
+  if (nrow(test_df) > args$n_ts) {
+    test_df <- test_df[sample(nrow(test_df), args$n_ts), ]
+  }
   test_data_X[[key]] <- as.matrix(test_df[, 1:f])
   test_data_Y[[key]] <- as.matrix(test_df[, (f + label + 1), drop = FALSE])
   test_data_label[[key]] <- matrix(label, nrow = nrow(test_data_X[[key]]), ncol=1)

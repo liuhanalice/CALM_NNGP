@@ -81,7 +81,19 @@ for (j in seq_along(existing_classes)) {
     # Re-fitting avoids transferring hyperparameters across R sessions, which is
     # unreliable with laGP's C-level objects.
     da <- darg(list(mle = TRUE), params$Z_t)
-    ga <- garg(list(mle = TRUE), matrix(params$Y_Z_t))
+    # garg derives its starting value from var(Y_Z_t). For a newly introduced class
+    # whose model hasn't learned it yet, all Y_Z_t values are near-constant
+    # (var ≈ 0), causing garg to produce a zero/negative start and fail.
+    # Fall back to fixed bounds in that case.
+    ga <- tryCatch(
+      garg(list(mle = TRUE), matrix(params$Y_Z_t)),
+      error = function(e) {
+        print(paste0("  garg failed (near-constant Y_Z_t, var=",
+                     round(var(as.numeric(params$Y_Z_t)), 8),
+                     ") - using default g bounds"))
+        list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
+      }
+    )
     gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
                          d = rep(da$start, ncol(params$Z_t)),
                          g = ga$start, dK = TRUE)

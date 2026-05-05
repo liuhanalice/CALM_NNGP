@@ -292,7 +292,15 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   # param="both" does joint alternating optimisation of d and g, which is more
   # numerically stable than sequential calls because g regularises K while d moves.
   da <- darg(list(mle = TRUE), X)
-  ga <- garg(list(mle = TRUE), matrix(Y))
+  ga <- tryCatch(
+    garg(list(mle = TRUE), matrix(Y)),
+    error = function(e) {
+      print(paste0("  garg failed for class ", label,
+                   " (near-constant Y, var=", round(var(as.numeric(Y)), 8),
+                   ") - using default g bounds"))
+      list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
+    }
+  )
   gp_model <- newGPsep(X = X, Z = Y,
                        d = rep(da$start, ncol(X)), g = ga$start, dK = TRUE)
   mleGPsep(gp_model, param = "both",

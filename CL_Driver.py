@@ -931,14 +931,18 @@ def main():
         if not args.no_checkpoint:
             save_checkpoint(ck_dir, t, model)
 
-        # Shared args for both R scripts
-        r_args_common = [
-            "--n_indcpts",        str(args.GP_num_indcpts),
-            "--GP_package",       args.GP_package,
-            "--save_path",        str(task_dir),
-            "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
+        # Classes new at this task vs. already seen before
+        new_classes_t = tasks[t]
+        old_classes_t = sum(tasks[:t], [])   # empty at task 0
+
+        # Args for GP_sample.R (all seen classes)
+        r_args_base = [
+            "--n_indcpts",  str(args.GP_num_indcpts),
+            "--GP_package", args.GP_package,
+            "--save_path",  str(task_dir),
         ]
-        r_args_sample = r_args_common + [
+        r_args_sample = r_args_base + [
+            "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
             "--feature_size",  str(args.f_size),
             "--sigma_perturb", str(args.GP_sigma_perturb),
             "--n_cand_mult",   str(args.GP_n_cand_mult),
@@ -955,10 +959,29 @@ def main():
             df_trGP.to_csv(os.path.join(task_dir, "replay_points.csv"), index=False)
 
         else:
+            # Copy GP model files for previously seen classes into task_dir.
+            # At task t>0, old-class params were trained at earlier tasks and
+            # accumulated in task{t-1}/; we carry them forward rather than retraining.
+            if old_classes_t:
+                if not args.skip_GP_train:
+                    src_dir = os.path.join(run_dir, f"task{t-1}")
+                else:
+                    src_dir = os.path.join(args.gp_model_dir, f"task{t-1}")
+                copied = 0
+                for old_label in old_classes_t:
+                    key = f"c{old_label}"
+                    for fname in [f"GPparams_{key}.rds", f"GPmodel_{key}.rda"]:
+                        src = os.path.join(src_dir, fname)
+                        if os.path.exists(src):
+                            shutil.copy(src, task_dir)
+                            copied += 1
+                print(f"[Task {t}] Copied {copied} GP model file(s) for old classes from {src_dir}")
+
             if not args.skip_GP_train:
-                # Run GP_train.R: fits GPs and saves GPparams_*.rds (+ GPmodel_*.rda for gplite)
-                print(f"[Task {t}] Running GP_train.R -> {task_dir}/GPparams_*.rds")
-                r_args_train = r_args_common + [
+                # Train GP only for new classes introduced at this task
+                print(f"[Task {t}] Running GP_train.R for new classes {new_classes_t} -> {task_dir}/GPparams_*.rds")
+                r_args_train = r_args_base + [
+                    "--existing_classes", ",".join(str(c) for c in new_classes_t),
                     "--n_tr",      str(args.GP_train_size_per_class),
                     "--n_ts",      str(args.GP_test_size_per_class),
                     "--n_octr",    str(args.GP_train_otc_size),
@@ -974,20 +997,6 @@ def main():
                     )
                 else:
                     run_rscript_and_wait(args.rscript_path, r_args_str=r_args_train, cwd=None)
-            else:
-                # Copy GPparams_*.rds (and GPmodel_*.rda for gplite) from the previous run
-                # into the current task_dir so GP_sample.R finds them at --save_path task_dir.
-                src_dir = os.path.join(args.gp_model_dir, f"task{t}")
-                if not os.path.isdir(src_dir):
-                    raise FileNotFoundError(f"Expected GP model dir not found: {src_dir}")
-                copied = 0
-                for fname in os.listdir(src_dir):
-                    if fname.startswith("GPparams_") or fname.startswith("GPmodel_"):
-                        shutil.copy(os.path.join(src_dir, fname), task_dir)
-                        copied += 1
-                if copied == 0:
-                    raise FileNotFoundError(f"No GPparams_*.rds / GPmodel_*.rda files found in {src_dir}")
-                print(f"[Task {t}] Copied {copied} GP model file(s) from {src_dir} -> {task_dir}")
 
             # Run GP_sample.R: perturb inducing points, score with GP, write replay_points.csv
             print(f"[Task {t}] Running GP_sample.R -> {task_dir}/replay_points.csv")

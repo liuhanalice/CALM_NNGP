@@ -76,11 +76,18 @@ for (j in seq_along(existing_classes)) {
     Z_seed <- gp_model$method$inducing
 
   } else if (GP_package == "laGP") {
-    # Reconstruct a small GP on (Z_t, Y_Z_t): inducing locations as inputs,
-    # full-GP posterior means at those locations as pseudo-targets.
-    # Same fitted hyperparameters (d, g) -> same kernel shape, no re-fitting needed.
+    # Re-fit a fresh GP on (Z_t, Y_Z_t). Y_Z_t are posterior means from the full
+    # training GP, so they encode the full GP's knowledge in n_indcpts pseudo-points.
+    # Re-fitting avoids transferring hyperparameters across R sessions, which is
+    # unreliable with laGP's C-level objects.
+    da <- darg(list(mle = TRUE), params$Z_t)
+    ga <- garg(list(mle = TRUE), matrix(params$Y_Z_t))
     gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
-                         d = as.numeric(params$d), g = as.numeric(params$g), dK = FALSE)
+                         d = rep(da$start, ncol(params$Z_t)),
+                         g = ga$start, dK = TRUE)
+    mleGPsep(gp_model, param = "both",
+             tmin = c(da$min, ga$min),
+             tmax = c(da$max, ga$max))
     Z_seed <- params$Z_t
 
   } else {

@@ -164,8 +164,6 @@ if (is_test) {
     } else if (GP_package == 'laGP') {
       saveRDS(list(label = label,
                    Z_t   = GPj$inducing_points,
-                   d     = GPj$d_fitted,
-                   g     = GPj$g_fitted,
                    Y_Z_t = GPj$Y_Z_t),
               file = paste0(args$save_path, "/GPparams_", key, ".rds"))
     }

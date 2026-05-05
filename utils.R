@@ -295,11 +295,9 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   ga <- garg(list(mle = TRUE), matrix(Y))
   gp_model <- newGPsep(X = X, Z = Y,
                        d = rep(da$start, ncol(X)), g = ga$start, dK = TRUE)
-  mle_out <- mleGPsep(gp_model, param = "both",
-                      tmin = c(da$min, ga$min),
-                      tmax = c(da$max, ga$max))
-  d_fitted <- as.numeric(mle_out$d)
-  g_fitted <- as.numeric(mle_out$g)
+  mleGPsep(gp_model, param = "both",
+           tmin = c(da$min, ga$min),
+           tmax = c(da$max, ga$max))
 
   out <- predGPsep(gp_model, X)
   out.val <- predGPsep(gp_model, val.X)
@@ -338,7 +336,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     xlab("Y_true") + ylab("Y_pred")
 
   return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points,
-              d_fitted = d_fitted, g_fitted = g_fitted, Y_Z_t = Y_Z_t))
+              Y_Z_t = Y_Z_t))
 }
 
 

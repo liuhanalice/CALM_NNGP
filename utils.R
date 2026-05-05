@@ -285,13 +285,21 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     stop("Number of rows in X and Y must be equal")
   }
 
-  # laGP, not using inducing points, but sample some points to save as "inducing/sampling reference points"
-  gp_model <- newGPsep(X=X, Z=Y, d = rep(10, ncol(X)), g = 1e-6, dK = TRUE)
-  # Split "both" into two explicit calls: mleGPsep(param="both") can return $d as a
-  # list of intermediate vectors (one per alternating step) rather than a length-p vector,
-  # causing length(d) != ncol(X) errors on reconstruction.
-  mle_d <- mleGPsep(gp_model, param = "d")
-  mle_g <- mleGPsep(gp_model, param = "g")
+  # laGP GP fit with data-driven hyperparameter bounds.
+  # darg/garg compute tmin/tmax from the actual data scale, preventing d from
+  # hitting an arbitrary ceiling (e.g. 256) that makes K near-singular and
+  # causes Cholesky failures when subsequently optimising g.
+  # param="both" does joint alternating optimisation of d and g, which is more
+  # numerically stable than sequential calls because g regularises K while d moves.
+  da <- darg(list(mle = TRUE), X)
+  ga <- garg(list(mle = TRUE), matrix(Y))
+  gp_model <- newGPsep(X = X, Z = Y,
+                       d = rep(da$start, ncol(X)), g = ga$start, dK = TRUE)
+  mle_out <- mleGPsep(gp_model, param = "both",
+                      tmin = c(da$min, ga$min),
+                      tmax = c(da$max, ga$max))
+  d_fitted <- as.numeric(mle_out$d)
+  g_fitted <- as.numeric(mle_out$g)
 
   out <- predGPsep(gp_model, X)
   out.val <- predGPsep(gp_model, val.X)
@@ -330,7 +338,7 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     xlab("Y_true") + ylab("Y_pred")
 
   return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points,
-              d_fitted = as.numeric(mle_d$d), g_fitted = as.numeric(mle_g$g), Y_Z_t = Y_Z_t))
+              d_fitted = d_fitted, g_fitted = g_fitted, Y_Z_t = Y_Z_t))
 }
 
 

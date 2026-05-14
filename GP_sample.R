@@ -1,20 +1,18 @@
 # GP_sample.R
 # Loads trained GP models saved by GP_train.R and generates replay-buffer points
-# using Strategy 3 (Perturb + GP-Filter):
-#   1. Perturb seed inducing points with Gaussian noise -> candidate X*
-#   2. Score each candidate with the class GP (predicts softmax score)
-#   3. Keep top n_indcpts per class
-# Overwrites inducing_points.csv with GP-sampled points.
+# by sampling from the class distribution (center + covariance) and keeping only
+# candidates whose GP score is >= score_threshold (resampling until enough are found).
 #
 # Supports --GP_package gplite | laGP  (same flag as GP_train.R)
 #
-# gplite: loads GPmodel_{key}.rda via gp_load; seeds from model$method$inducing
+# gplite: loads GPmodel_{key}.rda via gp_load
 # laGP:   cannot persist C pointers; reconstructs GP from GPparams_{key}.rds
-#         (d, g, X_train, Y_train saved by GP_train.R)
+#         (Z_t, Y_Z_t saved by GP_train.R)
 
 library(optparse)
 library(gplite)
 library(laGP)
+library(MASS)
 source("utils.R")
 
 option_list <- list(
@@ -28,10 +26,12 @@ option_list <- list(
               help = "GP-sampled points to keep per class [default: %default]"),
   make_option(c("--GP_package"),         type = "character", default = "gplite",
               help = "GP package used in GP_train.R: gplite or laGP [default: %default]"),
-  make_option(c("--sigma_perturb"),      type = "numeric",   default = 0.05,
-              help = "Std of Gaussian perturbation noise added to seed points [default: %default]"),
   make_option(c("--n_cand_mult"),        type = "numeric",   default = 10,
-              help = "n_candidates = n_indcpts * n_cand_mult [default: %default]"),
+              help = "Candidates per resample iteration = n_indcpts * n_cand_mult [default: %default]"),
+  make_option(c("--score_threshold"),    type = "numeric",   default = 0.9,
+              help = "Minimum GP score for a sample to be kept [default: %default]"),
+  make_option(c("--max_resample_iter"),  type = "numeric",   default = 50,
+              help = "Maximum resample iterations per class [default: %default]"),
   make_option(c("--seed"),               type = "numeric",   default = 42,
               help = "Random seed [default: %default]")
 )
@@ -45,16 +45,18 @@ if (is.null(args$save_path)) stop("--save_path is required")
 
 f                <- as.integer(args$feature_size)
 num_indcpts      <- as.integer(args$n_indcpts)
-n_candidates     <- as.integer(num_indcpts * args$n_cand_mult)
-sigma_perturb    <- args$sigma_perturb
+n_cand_per_iter  <- as.integer(num_indcpts * args$n_cand_mult)
+score_threshold  <- args$score_threshold
+max_resample_iter <- as.integer(args$max_resample_iter)
 GP_package       <- args$GP_package
 existing_classes <- as.list(as.numeric(strsplit(args$existing_classes, ",")[[1]]))
 
 print(paste0("GP_sample: package=", GP_package,
              ", classes=", args$existing_classes,
              ", n_indcpts=", num_indcpts,
-             ", n_candidates=", n_candidates,
-             ", sigma_perturb=", sigma_perturb))
+             ", n_cand_per_iter=", n_cand_per_iter,
+             ", score_threshold=", score_threshold,
+             ", max_resample_iter=", max_resample_iter))
 
 replay_all <- matrix(NA_real_, nrow = 0, ncol = f)
 labels_all   <- integer(0)
@@ -67,24 +69,18 @@ for (j in seq_along(existing_classes)) {
   if (!file.exists(params_file)) stop(paste("Missing params file:", params_file))
   params <- readRDS(params_file)
 
+  if (is.null(params$center) || is.null(params$covariance)) {
+    stop(paste0("GPparams_", key, ".rds is missing center/covariance — re-run GP_train.R"))
+  }
+
   # ---- Load / reconstruct GP model ----
   if (GP_package == "gplite") {
     model_file <- paste0(args$save_path, "/GPmodel_", key, ".rda")
     if (!file.exists(model_file)) stop(paste("Missing model file:", model_file))
     gp_model <- gp_load(model_file)
-    # Use the (potentially optimized) inducing locations stored inside the model
-    Z_seed <- gp_model$method$inducing
 
   } else if (GP_package == "laGP") {
-    # Re-fit a fresh GP on (Z_t, Y_Z_t). Y_Z_t are posterior means from the full
-    # training GP, so they encode the full GP's knowledge in n_indcpts pseudo-points.
-    # Re-fitting avoids transferring hyperparameters across R sessions, which is
-    # unreliable with laGP's C-level objects.
     da <- darg(list(mle = TRUE), params$Z_t)
-    # garg derives its starting value from var(Y_Z_t). For a newly introduced class
-    # whose model hasn't learned it yet, all Y_Z_t values are near-constant
-    # (var ≈ 0), causing garg to produce a zero/negative start and fail.
-    # Fall back to fixed bounds in that case.
     ga <- tryCatch(
       garg(list(mle = TRUE), matrix(params$Y_Z_t)),
       error = function(e) {
@@ -100,45 +96,66 @@ for (j in seq_along(existing_classes)) {
     mleGPsep(gp_model, param = "both",
              tmin = c(da$min, ga$min),
              tmax = c(da$max, ga$max))
-    Z_seed <- params$Z_t
 
   } else {
     stop(paste("Unknown GP_package:", GP_package))
   }
 
-  print(paste0("Class ", label, ": seeding from ", nrow(Z_seed), " inducing points"))
+  # ---- Sample from class distribution and filter by GP score ----
+  center     <- params$center
+  # Small diagonal jitter for numerical stability of mvrnorm
+  covariance <- params$covariance + diag(1e-8, nrow(params$covariance))
 
-  # ---- Perturb seed points to generate candidates ----
-  base_idx <- sample(nrow(Z_seed), n_candidates, replace = TRUE)
-  noise    <- matrix(rnorm(n_candidates * f, sd = sigma_perturb),
-                     nrow = n_candidates, ncol = f)
-  X_cand   <- Z_seed[base_idx, , drop = FALSE] + noise
+  print(paste0("Class ", label, ": sampling from class distribution (center + covariance)"))
 
-  # ---- Score candidates with the class GP ----
-  if (GP_package == "gplite") {
-    pred   <- gp_pred(gp_model, X_cand, jitter = 1e-4)
-    scores <- as.numeric(pred$mean)
-  } else {
-    pred   <- predGPsep(gp_model, X_cand)
-    scores <- as.numeric(pred$mean)
-    deleteGPsep(gp_model)   # free C memory immediately after use
+  collected      <- matrix(NA_real_, nrow = 0, ncol = f)
+  kept_scores    <- numeric(0)
+  iter           <- 0
+
+  while (nrow(collected) < num_indcpts && iter < max_resample_iter) {
+    iter   <- iter + 1
+    X_cand <- mvrnorm(n_cand_per_iter, mu = center, Sigma = covariance)
+
+    if (GP_package == "gplite") {
+      scores <- as.numeric(gp_pred(gp_model, X_cand, jitter = 1e-4)$mean)
+    } else {
+      scores <- as.numeric(predGPsep(gp_model, X_cand)$mean)
+    }
+
+    keep <- which(scores >= score_threshold)
+    if (length(keep) > 0) {
+      collected   <- rbind(collected, X_cand[keep, , drop = FALSE])
+      kept_scores <- c(kept_scores, scores[keep])
+    }
+    print(paste0("  iter ", iter, ": ", length(keep), "/", n_cand_per_iter,
+                 " passed score >= ", score_threshold,
+                 " (collected ", nrow(collected), "/", num_indcpts, ")"))
   }
 
-  # # ---- Keep top n_indcpts by GP confidence score ----
-  # k    <- min(num_indcpts, length(scores))
-  k <- n_candidates
-  keep <- order(scores, decreasing = TRUE)[seq_len(k)]
-  X_sel <- X_cand[keep, , drop = FALSE]
+  if (GP_package == "laGP") deleteGPsep(gp_model)
 
-  print(paste0("  kept ", nrow(X_sel), " points",
-               " | score range of kept: [",
-               round(scores[keep[k]], 4), ", ", round(scores[keep[1]], 4), "]"))
+  if (nrow(collected) == 0) {
+    warning(paste0("Class ", label, ": no samples passed threshold after ",
+                   max_resample_iter, " iterations — skipping"))
+    next
+  }
 
-  replay_all <- rbind(replay_all, X_sel)
-  labels_all   <- c(labels_all, rep(as.integer(label), nrow(X_sel)))
+  # Cap to num_indcpts if we collected more
+  if (nrow(collected) > num_indcpts) {
+    sel        <- sample(nrow(collected), num_indcpts)
+    collected  <- collected[sel, , drop = FALSE]
+    kept_scores <- kept_scores[sel]
+  }
+
+  print(paste0("  Class ", label, ": kept ", nrow(collected), " points",
+               " | score range [", round(min(kept_scores), 4),
+               ", ", round(max(kept_scores), 4), "]"))
+
+  replay_all <- rbind(replay_all, collected)
+  labels_all   <- c(labels_all, rep(as.integer(label), nrow(collected)))
 }
 
-# ---- Write inducing_points.csv (same format as GP_train.R) ----
+# ---- Write replay_points.csv ----
 out_df <- as.data.frame(replay_all)
 colnames(out_df) <- paste0("f", seq_len(f) - 1)
 out_df$label <- labels_all

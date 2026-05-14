@@ -159,12 +159,17 @@ if (is_test) {
     print(GPj$plot)
     if (GP_package == 'gplite') {
       gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
-      saveRDS(list(label = label, Z_t = GPj$inducing_points),
+      saveRDS(list(label      = label,
+                   Z_t        = GPj$inducing_points,
+                   center     = GPj$center,
+                   covariance = GPj$covariance),
               file = paste0(args$save_path, "/GPparams_", key, ".rds"))
     } else if (GP_package == 'laGP') {
-      saveRDS(list(label = label,
-                   Z_t   = GPj$inducing_points,
-                   Y_Z_t = GPj$Y_Z_t),
+      saveRDS(list(label      = label,
+                   Z_t        = GPj$inducing_points,
+                   Y_Z_t      = GPj$Y_Z_t,
+                   center     = GPj$center,
+                   covariance = GPj$covariance),
               file = paste0(args$save_path, "/GPparams_", key, ".rds"))
     }
     print(paste0("Saved GPparams_", key, ".rds"))

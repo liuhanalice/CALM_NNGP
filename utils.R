@@ -253,6 +253,10 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
   else { # return all training points
     inducing_points <- X_t
   }
+
+  center     <- colMeans(X_t)
+  covariance <- cov(X_t)
+
   mse <- norm(out.val$mean - val.Y, "2")
   print(paste0("validation MSE for class", label, ": ", mse))
 
@@ -265,7 +269,8 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
     ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
     xlab("Y_true") + ylab("Y_pred")
 
-  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points))
+  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot,
+              inducing_points = inducing_points, center = center, covariance = covariance))
 }
 
 
@@ -331,6 +336,9 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
   # Lets GP_sample.R reconstruct a small GP on (Z_t, Y_Z_t) instead of full (X, Y).
   Y_Z_t <- predGPsep(gp_model, inducing_points)$mean
 
+  center     <- colMeans(X_t)
+  covariance <- cov(X_t)
+
   print(paste0("Selecting ", nrow(inducing_points), " inducing points"))
   mse <- norm(out.val$mean - val.Y, "2")
   print(paste0("validation MSE for class", label, ": ", mse))
@@ -343,8 +351,9 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
     xlab("Y_true") + ylab("Y_pred")
 
-  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot, inducing_points = inducing_points,
-              Y_Z_t = Y_Z_t))
+  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot,
+              inducing_points = inducing_points, Y_Z_t = Y_Z_t,
+              center = center, covariance = covariance))
 }
 
 

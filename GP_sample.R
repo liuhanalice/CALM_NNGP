@@ -124,8 +124,9 @@ for (j in seq_along(existing_classes)) {
     deleteGPsep(gp_model)   # free C memory immediately after use
   }
 
-  # ---- Keep top n_indcpts by GP confidence score ----
-  k    <- min(num_indcpts, length(scores))
+  # # ---- Keep top n_indcpts by GP confidence score ----
+  # k    <- min(num_indcpts, length(scores))
+  k <- n_candidates
   keep <- order(scores, decreasing = TRUE)[seq_len(k)]
   X_sel <- X_cand[keep, , drop = FALSE]
 

@@ -22,12 +22,10 @@ option_list <- list(
               help = "Directory written by GP_train.R (contains GPparams_*.rds)"),
   make_option(c("--existing_classes"),   type = "character", default = "0,1",
               help = "Comma-separated class labels, same as GP_train.R [default: %default]"),
-  make_option(c("--n_indcpts"),          type = "numeric",   default = 1000,
-              help = "GP-sampled points to keep per class [default: %default]"),
+  make_option(c("--n_replay"),           type = "numeric",   default = 1000,
+              help = "Replay points to keep per class [default: %default]"),
   make_option(c("--GP_package"),         type = "character", default = "gplite",
               help = "GP package used in GP_train.R: gplite or laGP [default: %default]"),
-  make_option(c("--n_cand_mult"),        type = "numeric",   default = 10,
-              help = "Candidates per resample iteration = n_indcpts * n_cand_mult [default: %default]"),
   make_option(c("--score_threshold"),    type = "numeric",   default = 0.9,
               help = "Minimum GP score for a sample to be kept [default: %default]"),
   make_option(c("--max_resample_iter"),  type = "numeric",   default = 50,
@@ -44,8 +42,8 @@ set.seed(args$seed)
 if (is.null(args$save_path)) stop("--save_path is required")
 
 f                <- as.integer(args$feature_size)
-num_indcpts      <- as.integer(args$n_indcpts)
-n_cand_per_iter  <- as.integer(num_indcpts * args$n_cand_mult)
+num_replay      <- as.integer(args$n_replay)
+
 score_threshold  <- args$score_threshold
 max_resample_iter <- as.integer(args$max_resample_iter)
 GP_package       <- args$GP_package
@@ -53,8 +51,7 @@ existing_classes <- as.list(as.numeric(strsplit(args$existing_classes, ",")[[1]]
 
 print(paste0("GP_sample: package=", GP_package,
              ", classes=", args$existing_classes,
-             ", n_indcpts=", num_indcpts,
-             ", n_cand_per_iter=", n_cand_per_iter,
+             ", n_replay=", num_replay,
              ", score_threshold=", score_threshold,
              ", max_resample_iter=", max_resample_iter))
 
@@ -112,9 +109,9 @@ for (j in seq_along(existing_classes)) {
   kept_scores    <- numeric(0)
   iter           <- 0
 
-  while (nrow(collected) < num_indcpts && iter < max_resample_iter) {
+  while (nrow(collected) < num_replay && iter < max_resample_iter) {
     iter   <- iter + 1
-    X_cand <- mvrnorm(n_cand_per_iter, mu = center, Sigma = covariance)
+    X_cand <- mvrnorm(num_replay, mu = center, Sigma = covariance)
 
     if (GP_package == "gplite") {
       scores <- as.numeric(gp_pred(gp_model, X_cand, jitter = 1e-4)$mean)
@@ -127,9 +124,9 @@ for (j in seq_along(existing_classes)) {
       collected   <- rbind(collected, X_cand[keep, , drop = FALSE])
       kept_scores <- c(kept_scores, scores[keep])
     }
-    print(paste0("  iter ", iter, ": ", length(keep), "/", n_cand_per_iter,
+    print(paste0("  iter ", iter, ": ", length(keep), "/", num_replay,
                  " passed score >= ", score_threshold,
-                 " (collected ", nrow(collected), "/", num_indcpts, ")"))
+                 " (collected ", nrow(collected), "/", num_replay, ")"))
   }
 
   if (GP_package == "laGP") deleteGPsep(gp_model)
@@ -140,9 +137,9 @@ for (j in seq_along(existing_classes)) {
     next
   }
 
-  # Cap to num_indcpts if we collected more
-  if (nrow(collected) > num_indcpts) {
-    sel        <- sample(nrow(collected), num_indcpts)
+  # Cap to num_replay if we collected more
+  if (nrow(collected) > num_replay) {
+    sel        <- sample(nrow(collected), num_replay)
     collected  <- collected[sel, , drop = FALSE]
     kept_scores <- kept_scores[sel]
   }

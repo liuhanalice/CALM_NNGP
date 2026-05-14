@@ -674,8 +674,10 @@ def main():
     parser.add_argument("--GP_train_otc_size", type=int, default=50)
     parser.add_argument("--GP_num_indcpts", type=int, default=1000)
     parser.add_argument("--GP_package", type=str, default="gplite")
-    parser.add_argument("--GP_sigma_perturb", type=float, default=0.05,
-                        help="Perturbation noise std passed to GP_sample.R.")
+    parser.add_argument("--GP_score_threshold", type=float, default=0.9,
+                        help="Minimum GP score for a sample to be kept in GP_sample.R.")
+    parser.add_argument("--GP_max_resample_iter", type=int, default=50,
+                        help="Maximum resample iterations per class in GP_sample.R.")
     parser.add_argument("--GP_n_cand_mult", type=int, default=10,
                         help="Candidate multiplier passed to GP_sample.R (n_cand = n_indcpts * mult).")
     parser.add_argument("--skip_GP", action="store_true",
@@ -942,11 +944,12 @@ def main():
             "--save_path",  str(task_dir),
         ]
         r_args_sample = r_args_base + [
-            "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
-            "--feature_size",  str(args.f_size),
-            "--sigma_perturb", str(args.GP_sigma_perturb),
-            "--n_cand_mult",   str(args.GP_n_cand_mult),
-            "--seed",          str(args.seed),
+            "--existing_classes",   ",".join(str(c) for c in seen_classes_per_task[t]),
+            "--feature_size",       str(args.f_size),
+            "--score_threshold",    str(args.GP_score_threshold),
+            "--max_resample_iter",  str(args.GP_max_resample_iter),
+            "--n_cand_mult",        str(args.GP_n_cand_mult),
+            "--seed",               str(args.seed),
         ]
 
         if skip_GP:

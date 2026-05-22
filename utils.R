@@ -202,7 +202,7 @@ train_GP_v2 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
 }
 
 
-# Train GP version 3: num_inducing are inducing points for **target class**
+# Train GP version 3: num_inducing are inducing points for **target class + other classes**
 train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducing, num_inducing) {
   if (nrow(val.X) != nrow(val.Y)) {
     stop("Number of rows in val.X and val.Y must be equal")
@@ -231,11 +231,14 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
     }
     # use manually selected inducing points(randomly selected)
     set.seed(42)
-    # num_inducing only for target class (X_t)
-    Z_t <- X_t[sample(1:nrow(X_t), num_inducing), , drop = FALSE]
+    # Target-class inducing points (Y≈1)
+    Z_t   <- X_t[sample(1:nrow(X_t), num_inducing), , drop = FALSE]
+    # Other-class inducing points (Y≈0) — mixed FITC set covers the decision boundary
+    n_otc <- min(nrow(X_otc), num_inducing)
+    Z_otc <- X_otc[sample(1:nrow(X_otc), n_otc), , drop = FALSE]
+    Z     <- rbind(Z_t, Z_otc)
 
-    gp_model <- gp_init(cf_sexp(), method = method_fitc(inducing = Z_t))
-    # gp_model <- gp_init(cf_sexp(), lik = lik_gaussian(), method = method_full()) # TODO: test not training with inducing points
+    gp_model <- gp_init(cf_sexp(), method = method_fitc(inducing = Z))
   }
   else{
     gp_model <- gp_init(cf_sexp(), lik = lik_gaussian(), method = method_full())
@@ -244,14 +247,12 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
   gp_model <- gp_optim(gp_model, X, Y, verbose = FALSE, restarts = 3, tol = 1e-04, tol_param = 0.1, maxiter = 500, jitter = 1e-6)
   out <- gp_pred(gp_model, X, jitter = 1e-6)
   out.val <- gp_pred(gp_model, val.X, jitter = 1e-6)
-  
-  # save only target class inducing points (for manually selected methods)
+
   if (use_inducing) {
-    # inducing_points <- gp_model$method$inducing
-    inducing_points <- Z_t
+    inducing_points <- Z
   }
   else { # return all training points
-    inducing_points <- X_t
+    inducing_points <- rbind(X_t, X_otc)
   }
 
   center     <- colMeans(X_t)
@@ -274,7 +275,7 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
 }
 
 
-# Train GP version 3: num_inducing are inducing points for **target class**
+# Train GP laGP: num_inducing are inducing points for **target class + other classes**
 train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducing, num_inducing) {
   if (nrow(val.X) != nrow(val.Y)) {
     stop("Number of rows in val.X and val.Y must be equal")
@@ -323,17 +324,21 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
     }
     # use manually selected inducing points(randomly selected)
     set.seed(42)
-    # num_inducing only for target class (X_t)
-    Z_t <- X_t[sample(1:nrow(X_t), num_inducing), , drop = FALSE]
-
-    inducing_points <- Z_t
+    # Target-class inducing points (Y≈1)
+    Z_t   <- X_t[sample(1:nrow(X_t), num_inducing), , drop = FALSE]
+    # Other-class inducing points (Y≈0) — include so the reconstructed GP
+    # represents the decision boundary rather than extrapolating to prior≈1 OOD
+    n_otc <- min(nrow(X_otc), num_inducing)
+    Z_otc <- X_otc[sample(1:nrow(X_otc), n_otc), , drop = FALSE]
+    inducing_points <- rbind(Z_t, Z_otc)
   }
   else { # return all training points
-    inducing_points <- X_t
+    inducing_points <- rbind(X_t, X_otc)
   }
 
   # Predict full GP's posterior mean at inducing locations -> pseudo-targets.
   # Lets GP_sample.R reconstruct a small GP on (Z_t, Y_Z_t) instead of full (X, Y).
+  # Y_Z_t now contains mixed scores (~1 for target rows, ~0 for other-class rows).
   Y_Z_t <- predGPsep(gp_model, inducing_points)$mean
 
   center     <- colMeans(X_t)

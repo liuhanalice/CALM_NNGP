@@ -30,6 +30,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import platform
 
 import torch
 
@@ -206,6 +207,8 @@ def run_gp_eval(task_dir, existing_classes, f_size, gp_package, rscript_dir):
         raise FileNotFoundError(f"check_gp_on_replay.R not found: {r_script}")
 
     rscript_exe = shutil.which("Rscript") or "Rscript"
+    if platform.system() == "Windows":
+        rscript_exe = r"C:\Program Files\R\R-4.5.1\bin\Rscript.exe"
     cmd = [
         rscript_exe, r_script,
         "--save_path",        task_dir,

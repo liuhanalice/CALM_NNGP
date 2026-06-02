@@ -237,14 +237,25 @@ def main():
 
     # Summary bar chart appended as the last subplot
     if summary_rows:
-        fig2, ax2 = plt.subplots(figsize=(max(4, len(summary_rows) * 1.5), 4))
-        summary_df.rename(columns=rename).T.plot(kind="bar", ax=ax2, rot=15)
+        short_labels = {name: f"Run {i+1}" for i, name in enumerate(run_dirs)}
+        col_to_short = {labels[name]: short_labels[name] for name in run_dirs}
+
+        n_runs = len(run_dirs)
+        fig_height = 4 + 0.25 * n_runs
+        text_frac = min(0.35, 0.25 * n_runs / fig_height)
+
+        fig2, ax2 = plt.subplots(figsize=(max(4, len(summary_rows) * 1.5), fig_height))
+        summary_df.rename(columns=col_to_short).T.plot(kind="bar", ax=ax2, rot=0)
         ax2.set_ylim(0, 1.05)
         ax2.set_title("Mean accuracy / F1 across all tasks")
         ax2.set_ylabel("Score")
         ax2.legend(fontsize=7)
         ax2.grid(True, axis="y", alpha=0.3)
-        fig2.tight_layout()
+
+        legend_lines = [f"Run {i+1}: {labels[name]}" for i, name in enumerate(run_dirs)]
+        fig2.text(0.01, 0.005, "\n".join(legend_lines), fontsize=7, va="bottom",
+                  family="monospace")
+        fig2.tight_layout(rect=[0, text_frac, 1, 1])
 
     fig.tight_layout()
 

@@ -687,6 +687,9 @@ def main():
                         help="Skip GP_train.R but still run GP_sample.R. Requires --gp_model_dir.")
     parser.add_argument("--gp_model_dir", type=str, default=None,
                         help="Path to a previous run directory whose task{t}/GPparams_*.rds files are reused when --skip_GP_train is set.")
+    parser.add_argument("--retrain_all_gp", action="store_true",
+                        help="Retrain GP models for ALL seen classes at each task (not just new ones). "
+                             "Useful when you want to sample replay from the latest GP model per class.")
     parser.add_argument("--ce_onall", action="store_true", help="Whether to compute CE loss on all seen tasks' data (instead of just current task) during training.") # for experiments convenience;
 
     args = parser.parse_args()
@@ -965,7 +968,8 @@ def main():
             # Copy GP model files for previously seen classes into task_dir.
             # At task t>0, old-class params were trained at earlier tasks and
             # accumulated in task{t-1}/; we carry them forward rather than retraining.
-            if old_classes_t:
+            # Skip copy when --retrain_all_gp is set (all classes will be retrained below).
+            if old_classes_t and not args.retrain_all_gp:
                 if not args.skip_GP_train:
                     src_dir = os.path.join(run_dir, f"task{t-1}")
                 else:
@@ -981,12 +985,13 @@ def main():
                 print(f"[Task {t}] Copied {copied} GP model file(s) for old classes from {src_dir}")
 
             if not args.skip_GP_train:
-                # Train GP only for new classes; test on all seen classes
-                print(f"[Task {t}] Running GP_train.R for new classes {new_classes_t} -> {task_dir}/GPparams_*.rds")
+                # Determine which classes to train GP for
+                train_classes_t = seen_classes_per_task[t] if args.retrain_all_gp else new_classes_t
+                print(f"[Task {t}] Running GP_train.R for classes {train_classes_t} -> {task_dir}/GPparams_*.rds")
                 r_args_train = r_args_base + [
                     "--n_indcpts",        str(args.GP_num_indcpts),
                     "--existing_classes", ",".join(str(c) for c in seen_classes_per_task[t]),
-                    "--train_classes",    ",".join(str(c) for c in new_classes_t),
+                    "--train_classes",    ",".join(str(c) for c in train_classes_t),
                     "--n_tr",      str(args.GP_train_size_per_class),
                     "--n_ts",      str(args.GP_test_size_per_class),
                     "--n_octr",    str(args.GP_train_otc_size),

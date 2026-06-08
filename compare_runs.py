@@ -2,7 +2,7 @@
 Compare performance across multiple continual learning runs.
 
 Usage:
-    python compare_runs.py run_20260529_085555 run_20260529_094512 run_20260529_221443 run_20260529_221612 --save comparison.png
+    python compare_runs.py run_20260529_085555 run_20260529_094512 run_20260529_221443 run_20260529_221612 run_20260602_151658 run_20260602_151948 --save comparison.png
     python compare_runs.py --runs_root /path/to/runs run1 run2 run3
     python compare_runs.py run1 run2 --save comparison.png
 """

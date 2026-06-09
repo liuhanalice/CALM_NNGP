@@ -61,7 +61,7 @@ load_data_per_class <- function(df, label, n){
     n <- nrow(label_df)
   }
   select_index <- sample(nrow(label_df), n, replace = FALSE)
-  result_df <- label_df[select_index, ]
+  result_df <- label_df[select_index, drop=FALSE]
   return(result_df)
 }
 

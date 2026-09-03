@@ -35,4 +35,4 @@ which R
 R --version
 
 # Run the script
-python -u CL_Driver.py --log_every_epoch --epochs0=120 --epochs=120 --lambda_rec=1.0 --lambda_logit=1.5 --GP_train_size_per_class=3000 --GP_test_size_per_class=1000 --GP_train_otc_size=50 --GP_num_indcpts=30 --GP_package=laGP --num_replay=300 --GP_package=laGP --ce_onall --retrain_all_gp
+python -u CL_Driver.py --log_every_epoch --epochs0=120 --epochs=120 --lambda_rec=1.0 --lambda_logit=1.5 --GP_train_size_per_class=3000 --GP_test_size_per_class=1000 --GP_train_otc_size=50 --GP_num_indcpts=30 --GP_package=laGP --num_replay=300 --GP_package=laGP --ce_onall --retrain_all_gp --lambda_feat=0 --lambda_logit=0

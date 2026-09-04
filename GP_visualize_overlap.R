@@ -139,8 +139,15 @@ accept_rate_cand <- matrix(NA_real_, n_cls, n_cls, dimnames = list(class_keys, c
 
 for (ki in class_keys) {
   accepted_X <- cand_list[[ki]]$X[cand_list[[ki]]$accept, , drop = FALSE]
+  if (nrow(accepted_X) == 0) {
+    print(paste0("  NOTE: ", ki, " had 0/", n_vis,
+                 " candidates pass its OWN GP at score_threshold=", score_threshold,
+                 " — its cross-score row will be NA (threshold may be too high for this class,",
+                 " or its GP is fit weakly; check GP_sample.R's replay output for this class too)"))
+    next
+  }
   for (kj in class_keys) {
-    s_cand <- if (nrow(accepted_X) > 0) score_with(kj, accepted_X) else NA_real_
+    s_cand <- score_with(kj, accepted_X)
     mean_score_cand[ki, kj]  <- mean(s_cand)
     accept_rate_cand[ki, kj] <- mean(s_cand >= score_threshold)
   }
@@ -153,7 +160,7 @@ print(round(accept_rate_cand, 3))
 
 for (ki in class_keys) {
   for (kj in class_keys) {
-    if (ki != kj && accept_rate_cand[ki, kj] > 0.2) {
+    if (ki != kj && !is.na(accept_rate_cand[ki, kj]) && accept_rate_cand[ki, kj] > 0.2) {
       print(paste0("  WARNING: ", ki, "'s accepted candidates are also accepted by ", kj,
                    "'s GP ", round(accept_rate_cand[ki, kj] * 100, 1),
                    "% of the time — possible overlap between ", ki, " and ", kj))

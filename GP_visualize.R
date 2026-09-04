@@ -7,9 +7,12 @@
 #   - the score_threshold acceptance boundary, plus how that threshold compares
 #     to the empirical percentiles of the candidate score distribution
 #
-# Projection: a per-class PCA (center-only, no scaling) fit on
-# rbind(candidates, inducing points[, real data]) so the 2D layout reflects
-# the actual Euclidean/Mahalanobis-ish geometry of the sampling covariance.
+# Projection: a per-class, UNSUPERVISED UMAP embedding fit on
+# rbind(candidates, inducing points[, real data]). UMAP is used instead of
+# PCA because PCA is linear and optimizes for global variance, which can
+# make genuinely separable structure look smeared together; UMAP preserves
+# local neighborhood structure without using any label/score information,
+# so it's a fair (if nonlinear, non-fixed-axis) view of the raw geometry.
 #
 # Output: <out_path>/GP_visualize_<classes>.pdf (one scatter + one histogram
 # page per class) and a console table of threshold-vs-percentile stats.
@@ -75,7 +78,7 @@ print(paste0("GP_visualize: package=", GP_package,
              ", percentiles=", args$percentiles))
 
 pdf_path <- paste0(out_path, "/GP_visualize_", gsub(",", "_", args$existing_classes), ".pdf")
-pdf(file = pdf_path, width = 8, height = 6)
+pdf(file = pdf_path, width = 9, height = 6)
 
 summary_rows <- list()
 
@@ -162,18 +165,19 @@ for (j in seq_along(existing_classes)) {
 
   Z_t <- as.matrix(params$Z_t)
 
-  # ---- Local PCA (center-only) shared by candidates/inducing/real ----
+  # ---- Local UMAP (unsupervised) shared by candidates/inducing/real ----
   combined <- rbind(X_cand, Z_t)
   types    <- c(rep("candidate", nrow(X_cand)), rep("inducing", nrow(Z_t)))
   if (!is.null(real_X)) {
     combined <- rbind(combined, real_X)
     types    <- c(types, rep("real", nrow(real_X)))
   }
-  pca  <- prcomp(combined, center = TRUE, scale. = FALSE)
-  proj <- pca$x[, 1:2]
-  var_explained <- round(100 * (pca$sdev[1:2]^2) / sum(pca$sdev^2), 1)
+  umap_config <- umap.defaults
+  umap_config$random_state <- args$seed
+  umap_out <- umap(combined, config = umap_config)
+  proj <- umap_out$layout
 
-  plot_df <- data.frame(PC1 = proj[, 1], PC2 = proj[, 2], type = types)
+  plot_df <- data.frame(UMAP1 = proj[, 1], UMAP2 = proj[, 2], type = types)
   plot_df$score  <- NA_real_
   plot_df$accept <- NA
   plot_df$score[types == "candidate"]  <- scores
@@ -188,24 +192,23 @@ for (j in seq_along(existing_classes)) {
   p <- ggplot()
   if (!is.null(real_X)) {
     p <- p + geom_point(data = subset(plot_df, type == "real"),
-                         aes(x = PC1, y = PC2), color = "grey70", size = 1, alpha = 0.5)
+                         aes(x = UMAP1, y = UMAP2), color = "grey70", size = 1, alpha = 0.5)
   }
   p <- p +
     geom_point(data = subset(plot_df, type == "candidate"),
-               aes(x = PC1, y = PC2, fill = score, color = accept, size = accept),
+               aes(x = UMAP1, y = UMAP2, fill = score, color = accept, size = accept),
                shape = 21, stroke = 0.6, alpha = 0.85) +
     scale_fill_viridis_c(name = "GP score", limits = score_range, breaks = color_breaks) +
     scale_color_manual(values = c(`TRUE` = "black", `FALSE` = "grey85"), guide = "none") +
     scale_size_manual(values = c(`TRUE` = 2.4, `FALSE` = 1.3), guide = "none") +
     geom_point(data = subset(plot_df, type == "inducing"),
-               aes(x = PC1, y = PC2), shape = 4, size = 3, stroke = 1.2, color = "red") +
+               aes(x = UMAP1, y = UMAP2), shape = 4, size = 3, stroke = 1.2, color = "red") +
     labs(
-      title = paste0("Class ", label, ": candidate cloud colored by GP score"),
+      title = paste0("Class ", label, ": candidate cloud colored by GP score (unsupervised UMAP)"),
       subtitle = paste0("n_cand=", n_vis, " | accept@", score_threshold, "=",
                          round(mean(accept) * 100, 1), "% (=P", round(thresh_rank_pct, 1), ") | ",
                          "grey=real data, red X=inducing pts, black-outlined dots=accepted"),
-      x = paste0("PC1 (", var_explained[1], "%)"),
-      y = paste0("PC2 (", var_explained[2], "%)")
+      x = "UMAP1", y = "UMAP2"
     ) +
     theme_minimal()
   print(p)

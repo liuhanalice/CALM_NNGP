@@ -4,9 +4,16 @@
 # (a risk factor for confused replay / catastrophic-forgetting-style errors).
 #
 # Two complementary views:
-#   1. VISUAL: one global PCA (fit across all classes' points together, not a
-#      separate PCA per class) showing each class's accepted candidate cloud
-#      + a 95% coverage ellipse, and each class's inducing points (Z_t).
+#   1. VISUAL: one global, UNSUPERVISED UMAP embedding (fit across all
+#      classes' points together, not a separate embedding per class) showing
+#      each class's accepted candidate cloud + a 95% coverage ellipse, and
+#      each class's inducing points (Z_t). UMAP is used instead of PCA
+#      because PCA is linear and label-agnostic — it optimizes for global
+#      variance, not class separation, so it can show classes as overlapping
+#      even when they're separable via a nonlinear boundary. UMAP is still
+#      unsupervised (no label information feeds the embedding), so it's a
+#      fair, nonlinear view of the raw geometry — unlike a *supervised* UMAP
+#      or LDA, it can't fake separation that isn't there.
 #      Note inducing points already deliberately mix in some other-class
 #      (Y~=0) points to anchor the decision boundary (see train_GP_v3 /
 #      train_GP_laGP in utils.R), so overlap among inducing points across
@@ -204,11 +211,12 @@ for (key in class_keys) {
   }
 }
 
-pca  <- prcomp(combined, center = TRUE, scale. = FALSE)
-proj <- pca$x[, 1:2]
-var_explained <- round(100 * (pca$sdev[1:2]^2) / sum(pca$sdev^2), 1)
+umap_config <- umap.defaults
+umap_config$random_state <- args$seed
+umap_out <- umap(combined, config = umap_config)
+proj <- umap_out$layout
 
-plot_df <- data.frame(PC1 = proj[, 1], PC2 = proj[, 2],
+plot_df <- data.frame(UMAP1 = proj[, 1], UMAP2 = proj[, 2],
                        class = factor(class_col, levels = as.character(existing_classes)),
                        type = type_col)
 
@@ -222,36 +230,35 @@ pdf(file = pdf_path, width = 9, height = 7)
 p1 <- ggplot()
 if (!is.null(real_df)) {
   p1 <- p1 + geom_point(data = subset(plot_df, type == "real"),
-                         aes(x = PC1, y = PC2), color = "grey80", size = 0.8, alpha = 0.4)
+                         aes(x = UMAP1, y = UMAP2), color = "grey80", size = 0.8, alpha = 0.4)
 }
 p1 <- p1 +
   geom_point(data = subset(plot_df, type == "candidate"),
-             aes(x = PC1, y = PC2, fill = class), shape = 21, color = "transparent", size = 1.4, alpha = 0.45) +
+             aes(x = UMAP1, y = UMAP2, fill = class), shape = 21, color = "transparent", size = 1.4, alpha = 0.45) +
   stat_ellipse(data = subset(plot_df, type == "candidate"),
-               aes(x = PC1, y = PC2, color = class), level = 0.95, linewidth = 0.9) +
+               aes(x = UMAP1, y = UMAP2, color = class), level = 0.95, linewidth = 0.9) +
   geom_point(data = subset(plot_df, type == "inducing"),
-             aes(x = PC1, y = PC2, fill = class), shape = 21, color = "black", size = 2.8, stroke = 0.7) +
+             aes(x = UMAP1, y = UMAP2, fill = class), shape = 21, color = "black", size = 2.8, stroke = 0.7) +
   scale_fill_manual(values = palette, name = "class") +
   scale_color_manual(values = palette, guide = "none") +
   labs(
-    title = "All classes: GP-accepted clusters & inducing points (shared global PCA)",
+    title = "All classes: GP-accepted clusters & inducing points (shared global UMAP)",
     subtitle = paste0("threshold=", score_threshold, " | filled dots=accepted candidates, ",
                        "ellipse=95% coverage, black-outlined dots=inducing points",
-                       if (!is.null(real_df)) " | grey=real data" else ""),
-    x = paste0("PC1 (", var_explained[1], "%)"),
-    y = paste0("PC2 (", var_explained[2], "%)")
+                       if (!is.null(real_df)) " | grey=real data" else "",
+                       " | unsupervised UMAP (no label info in the embedding)"),
+    x = "UMAP1", y = "UMAP2"
   ) +
   theme_minimal()
 print(p1)
 
 # ---- Page 2: inducing points only (cleaner view; expect mixing by design — see header) ----
-p2 <- ggplot(subset(plot_df, type == "inducing"), aes(x = PC1, y = PC2, fill = class)) +
+p2 <- ggplot(subset(plot_df, type == "inducing"), aes(x = UMAP1, y = UMAP2, fill = class)) +
   geom_point(shape = 21, color = "black", size = 3, stroke = 0.8, alpha = 0.85) +
   scale_fill_manual(values = palette, name = "class") +
-  labs(title = "Inducing points only, by class (shared global PCA)",
+  labs(title = "Inducing points only, by class (shared global UMAP)",
        subtitle = "each class's inducing set deliberately mixes in other-class points to anchor the boundary, so some mixing here is expected",
-       x = paste0("PC1 (", var_explained[1], "%)"),
-       y = paste0("PC2 (", var_explained[2], "%)")) +
+       x = "UMAP1", y = "UMAP2") +
   theme_minimal()
 print(p2)
 

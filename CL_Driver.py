@@ -707,10 +707,12 @@ def main():
     skip_GP = args.skip_GP
 
     # Tasks: Task0 = [0..4], then single-digit tasks 5..9
-    tasks = [[0,1,2,3,4],[6],[7],[8],[9]]
+    # tasks = [[0,1,2,3,4],[6],[7],[8],[9]]
+    tasks = [[0,1], [2,3], [4,5], [6,7], [8,9]]
     seen_classes_per_task = [sorted(sum(tasks[:t+1], [])) for t in range(len(tasks))]
-    train_size = [15000,3000,3000,3000, 3000] #NOTE: Match number of tasks
-    # tasks = [[0,1,2,3,4,5,6,7,8], [9]]
+    # train_size = [15000,3000,3000,3000,3000] #NOTE: Match number of tasks
+    train_size = [6000,6000,6000,6000,6000] #NOTE: Match number of tasks
+
 
     # Output dirs
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")

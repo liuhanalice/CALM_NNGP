@@ -76,6 +76,9 @@ test_data_label <- list() # for convenient
 GPmodel_train <- list()
 GPresult_train <- list()
 mse_train <- list()
+mse_distilled_train <- list()  # laGP only: val MSE of the (Z_t, Y_Z_t)-reconstructed GP actually persisted to disk
+n_val_train <- list()
+n_indcpts_train <- list()
 
 is_test <- FALSE
 
@@ -155,8 +158,12 @@ if (is_test) {
     GPmodel_train[[key]] <- GPj$GPmodel
     GPresult_train[[key]] <- GPj$GPresult
     mse_train[[key]] <- GPj$mse
+    mse_distilled_train[[key]] <- if (!is.null(GPj$mse_distilled)) GPj$mse_distilled else NA_real_
+    n_val_train[[key]] <- nrow(val.X)
+    n_indcpts_train[[key]] <- nrow(GPj$inducing_points)
 
     print(GPj$plot)
+    if (GP_package == 'laGP') print(GPj$plot_distilled)
     if (GP_package == 'gplite') {
       gp_save(GPj$GPmodel, paste0(args$save_path, "/GPmodel_", key, ".rda"))
       saveRDS(list(label      = label,
@@ -177,6 +184,23 @@ if (is_test) {
   print("Train Finished")
   print("---------------------")
 
+  # Persist per-class training-time GP loss for cross-task plotting.
+  # mse_full   = held-out MSE of the just-fitted GP (thrown away for laGP -- never persisted)
+  # mse_distilled = held-out MSE of the (Z_t, Y_Z_t)-reconstructed GP that IS
+  #                 what gets saved to GPparams_*.rds and reloaded at replay/inference time
+  #                 (NA for gplite, which persists the fitted model directly, no reconstruction step)
+  gp_train_metrics_df <- data.frame(
+    class         = as.numeric(sub("^c", "", names(mse_train))),
+    mse_full      = unlist(mse_train, use.names = FALSE),
+    mse_distilled = unlist(mse_distilled_train, use.names = FALSE),
+    n_val         = unlist(n_val_train, use.names = FALSE),
+    n_indcpts     = unlist(n_indcpts_train, use.names = FALSE),
+    GP_package    = GP_package
+  )
+  gp_train_metrics_path <- paste0(args$save_path, "/gp_train_metrics.csv")
+  write.csv(gp_train_metrics_df, file = gp_train_metrics_path, row.names = FALSE)
+  print(paste0("Saved gp_train_metrics.csv -> ", gp_train_metrics_path))
+
   # Load GP models for old classes (copied from prev task) so testing covers all seen classes
   old_labels <- setdiff(unlist(existingclass_set), unlist(train_classes_set))
   for (label in old_labels) {
@@ -190,18 +214,7 @@ if (is_test) {
     if (GP_package == "gplite") {
       GPmodel_train[[key]] <- gp_load(paste0(args$save_path, "/GPmodel_", key, ".rda"))
     } else if (GP_package == "laGP") {
-      da <- darg(list(mle = TRUE), params$Z_t)
-      ga <- tryCatch(
-        garg(list(mle = TRUE), matrix(params$Y_Z_t)),
-        error = function(e) list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
-      )
-      gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
-                           d = rep(da$start, ncol(params$Z_t)),
-                           g = ga$start, dK = TRUE)
-      mleGPsep(gp_model, param = "both",
-               tmin = c(da$min, ga$min),
-               tmax = c(da$max, ga$max))
-      GPmodel_train[[key]] <- gp_model
+      GPmodel_train[[key]] <- reconstruct_laGP(params$Z_t, params$Y_Z_t, label = label)
     }
     print(paste0("Loaded GP model for old class ", label))
   }
@@ -242,7 +255,7 @@ test_result_plots <- plot_GP_distributions(test_result$GP_test_mean_mat_with_lab
 
 if (! is_test) {
   save(file = paste0(args$save_path, "/GPmodel_train.RData"),
-       GPmodel_train, GPresult_train, mse_train,
+       GPmodel_train, GPresult_train, mse_train, mse_distilled_train,
        train.df, val.df,
        all_data_X, all_data_Y, val_data_X, val_data_Y,
        test_data_X, test_data_Y, test_data_label)

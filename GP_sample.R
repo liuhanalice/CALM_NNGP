@@ -77,22 +77,7 @@ for (j in seq_along(existing_classes)) {
     gp_model <- gp_load(model_file)
 
   } else if (GP_package == "laGP") {
-    da <- darg(list(mle = TRUE), params$Z_t)
-    ga <- tryCatch(
-      garg(list(mle = TRUE), matrix(params$Y_Z_t)),
-      error = function(e) {
-        print(paste0("  garg failed (near-constant Y_Z_t, var=",
-                     round(var(as.numeric(params$Y_Z_t)), 8),
-                     ") - using default g bounds"))
-        list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
-      }
-    )
-    gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
-                         d = rep(da$start, ncol(params$Z_t)),
-                         g = ga$start, dK = TRUE)
-    mleGPsep(gp_model, param = "both",
-             tmin = c(da$min, ga$min),
-             tmax = c(da$max, ga$max))
+    gp_model <- reconstruct_laGP(params$Z_t, params$Y_Z_t, label = label)
 
   } else {
     stop(paste("Unknown GP_package:", GP_package))

@@ -54,18 +54,7 @@ for (label in unlist(existing_classes)) {
     if (!file.exists(rda_file)) stop(paste0("GPmodel rda not found: ", rda_file))
     GPmodels[[key]] <- gp_load(rda_file)
   } else if (GP_package == "laGP") {
-    da <- darg(list(mle = TRUE), params$Z_t)
-    ga <- tryCatch(
-      garg(list(mle = TRUE), matrix(params$Y_Z_t)),
-      error = function(e) list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
-    )
-    gp_model <- newGPsep(X = params$Z_t, Z = params$Y_Z_t,
-                         d = rep(da$start, ncol(params$Z_t)),
-                         g = ga$start, dK = TRUE)
-    mleGPsep(gp_model, param = "both",
-             tmin = c(da$min, ga$min),
-             tmax = c(da$max, ga$max))
-    GPmodels[[key]] <- gp_model
+    GPmodels[[key]] <- reconstruct_laGP(params$Z_t, params$Y_Z_t, label = label)
   } else {
     stop(paste0("Unknown GP_package: ", GP_package))
   }

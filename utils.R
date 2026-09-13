@@ -275,6 +275,31 @@ train_GP_v3 <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducin
 }
 
 
+# Refit a laGP GPsep from a saved (inducing_points, pseudo_targets) pair.
+# This is the SAME reconstruction recipe used when loading a persisted class
+# GP back from GPparams_c{label}.rds (GP_train.R old-class branch, GP_sample.R,
+# check_gp_on_replay.R) -- factored out here so the model we validate is
+# exactly the model that gets used at replay/inference time.
+# Caller is responsible for deleteGPsep() on the returned handle when done.
+reconstruct_laGP <- function(Z, Y_Z, label = NA) {
+  da <- darg(list(mle = TRUE), Z)
+  ga <- tryCatch(
+    garg(list(mle = TRUE), matrix(Y_Z)),
+    error = function(e) {
+      print(paste0("  garg failed for class ", label,
+                   " (near-constant Y_Z, var=", round(var(as.numeric(Y_Z)), 8),
+                   ") - using default g bounds"))
+      list(start = 1e-3, min = sqrt(.Machine$double.eps), max = 1.0)
+    }
+  )
+  gp_model <- newGPsep(X = Z, Z = Y_Z,
+                       d = rep(da$start, ncol(Z)), g = ga$start, dK = TRUE)
+  mleGPsep(gp_model, param = "both",
+           tmin = c(da$min, ga$min),
+           tmax = c(da$max, ga$max))
+  gp_model
+}
+
 # Train GP laGP: num_inducing are inducing points for **target class + other classes**
 train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_inducing, num_inducing) {
   if (nrow(val.X) != nrow(val.Y)) {
@@ -346,17 +371,36 @@ train_GP_laGP <- function(X_t, X_otc, Y_t, Y_otc, val.X, val.Y, label, use_induc
 
   print(paste0("Selecting ", nrow(inducing_points), " inducing points"))
   mse <- norm(out.val$mean - val.Y, "2")
-  print(paste0("validation MSE for class", label, ": ", mse))
+  print(paste0("validation MSE for class", label, " (full GP): ", mse))
+
+  # ---- Validate the DISTILLED GP: refit on (inducing_points, Y_Z_t) exactly
+  # as it will be reconstructed at load time, then score it on the SAME
+  # val.X/val.Y as the full GP above. This is the model actually used for
+  # replay sampling and GP-argmax classification once persisted to disk, so
+  # it -- not the full GP -- is the one whose loss should be tracked.
+  gp_distilled     <- reconstruct_laGP(inducing_points, Y_Z_t, label = label)
+  out.val.distilled <- predGPsep(gp_distilled, val.X)
+  mse_distilled    <- norm(out.val.distilled$mean - val.Y, "2")
+  deleteGPsep(gp_distilled)
+  print(paste0("validation MSE for class", label, " (distilled GP): ", mse_distilled))
 
   # train vs. val MSE plot
   plot_df <- data.frame(Y_true = as.numeric(val.Y), Y_pred = out.val$mean)
   plot <- ggplot(plot_df, aes(x = Y_true, y = Y_pred)) +
     geom_point() +
     coord_equal() +
-    ggtitle(paste0("Validation True vs. Pred (class=", label, ")")) +
+    ggtitle(paste0("Validation True vs. Pred (class=", label, ", full GP)")) +
     xlab("Y_true") + ylab("Y_pred")
 
-  return(list(GPmodel = gp_model, GPresult = out, mse = mse, plot = plot,
+  plot_df_distilled <- data.frame(Y_true = as.numeric(val.Y), Y_pred = out.val.distilled$mean)
+  plot_distilled <- ggplot(plot_df_distilled, aes(x = Y_true, y = Y_pred)) +
+    geom_point() +
+    coord_equal() +
+    ggtitle(paste0("Validation True vs. Pred (class=", label, ", distilled GP)")) +
+    xlab("Y_true") + ylab("Y_pred")
+
+  return(list(GPmodel = gp_model, GPresult = out, mse = mse, mse_distilled = mse_distilled,
+              plot = plot, plot_distilled = plot_distilled,
               inducing_points = inducing_points, Y_Z_t = Y_Z_t,
               center = center, covariance = covariance))
 }

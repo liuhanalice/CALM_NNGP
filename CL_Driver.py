@@ -229,9 +229,12 @@ def init_metrics_csv(out_dir, tasks, fname="metrics.csv"):
         "train_feat_reg_ae",
         "train_logit_reg_head",
         "train_acc",
-        "test_ce_loss", 
+        "train_acc_per_class",
+        "test_ce_loss",
+        "test_ce_mean",
         "test_acc_mean",
         "test_accs_seen",
+        "test_acc_per_class",
         "test_rec_loss",
     ]
 
@@ -258,6 +261,47 @@ def eval_seen_per_task(model, loaders_list, device):
         res = test(model, ld, device=device, report_recon=False)
         accs.append(res["accuracy"])
     return accs
+
+@torch.no_grad()
+def eval_seen_per_class(model, loaders_list, device):
+    """
+    Returns dict {label: accuracy in [0,1]} computed over all samples
+    across the provided (seen-task) test loaders, broken down by true label.
+    """
+    model.eval(); model.to(device)
+    class_correct, class_total = {}, {}
+    for ld in loaders_list:
+        for x, y in ld:
+            x, y = x.to(device), y.to(device)
+            logits, _, _ = model(x)
+            preds = logits.argmax(1)
+            y_np = y.detach().cpu().numpy()
+            preds_np = preds.detach().cpu().numpy()
+            for lbl in np.unique(y_np):
+                lbl = int(lbl)
+                mask = y_np == lbl
+                class_total[lbl] = class_total.get(lbl, 0) + int(mask.sum())
+                class_correct[lbl] = class_correct.get(lbl, 0) + int((preds_np[mask] == lbl).sum())
+    return {lbl: class_correct[lbl] / class_total[lbl] for lbl in class_total if class_total[lbl] > 0}
+
+
+@torch.no_grad()
+def eval_seen_ce_mean(model, loaders_list, device):
+    """
+    Cross-entropy loss (mean per-sample), pooled over ALL samples across the
+    provided (seen-task) test loaders -- a single held-out CE number to plot
+    next to the training CE curve for a generalization-gap view.
+    """
+    model.eval(); model.to(device)
+    total_ce, total = 0.0, 0
+    for ld in loaders_list:
+        for x, y in ld:
+            x, y = x.to(device), y.to(device)
+            logits, _, _ = model(x)
+            total_ce += F.cross_entropy(logits, y, reduction="sum").item()
+            total += y.size(0)
+    return total_ce / max(total, 1)
+
 
 def eval_seen_mean(model, loaders_list, device):
     """
@@ -392,6 +436,62 @@ def make_recovered_dataset(images, labels):
     return RecoveredDataset(images, labels)
 
 
+@torch.no_grad()
+def save_decode_diagnostics(model, tr_loader, out_dir, device, n_samples=2):
+    """
+    Once per task: save a handful of images from this task's (possibly
+    replay-augmented) training set for manual visual inspection.
+
+    - New-class samples are real images -> save (original, AE reconstruction)
+      side by side, since we have ground truth to compare against.
+    - Old-class samples are GP-replay images that are already decoded (they
+      were produced by decode_features_to_images() at the end of the
+      previous task and concatenated into this task's dataset as-is) -> just
+      display them; there is no "original" to compare a synthetic feature
+      vector against.
+
+    No-ops for task 0 (no old-class replay exists yet) and produces no
+    old-class panel then.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    ds = tr_loader.dataset
+
+    if isinstance(ds, ConcatDataset) and len(ds.datasets) == 2:
+        new_ds, old_ds = ds.datasets
+    else:
+        new_ds, old_ds = ds, None
+
+    n_new = min(n_samples, len(new_ds))
+    new_items = [new_ds[i] for i in range(n_new)]
+
+    if new_items:
+        model.eval(); model.to(device)
+        xb = torch.stack([x for x, _ in new_items]).to(device)
+        _, recon, _ = model(xb)
+        recon = recon.detach().cpu()
+
+        fig, axes = plt.subplots(n_new, 2, figsize=(4, 2 * n_new), squeeze=False)
+        for i, (x, y) in enumerate(new_items):
+            axes[i, 0].imshow(x.squeeze().numpy(), cmap="gray"); axes[i, 0].set_title(f"orig (label {y})"); axes[i, 0].axis("off")
+            axes[i, 1].imshow(recon[i].squeeze().numpy(), cmap="gray"); axes[i, 1].set_title("AE recon"); axes[i, 1].axis("off")
+        fig.suptitle("New-class: real vs. reconstructed")
+        fig.tight_layout()
+        fig.savefig(os.path.join(out_dir, "decode_check_new_classes.png"), dpi=150, bbox_inches="tight")
+        plt.close(fig)
+
+    if old_ds is not None and len(old_ds) > 0:
+        n_old = min(n_samples, len(old_ds))
+        old_items = [old_ds[i] for i in range(n_old)]
+
+        fig, axes = plt.subplots(1, n_old, figsize=(2 * n_old, 2), squeeze=False)
+        for i, (x, y) in enumerate(old_items):
+            axes[0, i].imshow(x.squeeze().numpy(), cmap="gray"); axes[0, i].set_title(f"decoded (label {y})"); axes[0, i].axis("off")
+        fig.suptitle("Old-class: GP-replay decoded (no ground truth)")
+        fig.tight_layout()
+        fig.savefig(os.path.join(out_dir, "decode_check_old_classes.png"), dpi=150, bbox_inches="tight")
+        plt.close(fig)
+
+
 def plot_acc_over_all_tasks(
     histories_per_task,
     epochs_per_task,
@@ -486,6 +586,191 @@ def plot_acc_over_all_tasks(
     else:
         plt.show()
 
+
+def _global_offsets(epochs_per_task):
+    offsets = [0]
+    for e in epochs_per_task[:-1]:
+        offsets.append(offsets[-1] + e)
+    return offsets
+
+
+def plot_label_wise_accuracy(
+    histories_per_task,
+    epochs_per_task,
+    tasks,
+    key,                      # "train_acc_per_class" or "test_acc_per_class"
+    title="Label-wise Accuracy over Global Epochs",
+    save_path=None
+):
+    """
+    One line per label. A label's line starts at the first global epoch of
+    the task that introduces it and continues through the end of training
+    (it keeps getting evaluated/trained on via replay in later tasks).
+    """
+    offsets = _global_offsets(epochs_per_task)
+    global_last_epoch = sum(epochs_per_task)
+
+    label_to_task = {lbl: ti for ti, labels in enumerate(tasks) for lbl in labels}
+    all_labels = sorted(label_to_task.keys())
+
+    xs = {lbl: [] for lbl in all_labels}
+    ys = {lbl: [] for lbl in all_labels}
+
+    for t, hist in enumerate(histories_per_task):
+        start = offsets[t]
+        for ep_idx, class_acc in enumerate(hist.get(key, [])):
+            if not class_acc:
+                continue
+            xg = start + ep_idx + 1
+            for lbl, acc in class_acc.items():
+                lbl = int(lbl)
+                xs.setdefault(lbl, [])
+                ys.setdefault(lbl, [])
+                xs[lbl].append(xg)
+                ys[lbl].append(acc)
+
+    plt.figure(figsize=(11, 6))
+    cmap = plt.get_cmap("tab20")
+    for i, lbl in enumerate(sorted(xs.keys())):
+        if not xs[lbl]:
+            continue
+        plt.plot(
+            xs[lbl], ys[lbl],
+            linewidth=1.8,
+            color=cmap(i % 20),
+            label=f"Label {lbl} (task {label_to_task.get(lbl, '?')})"
+        )
+
+    plt.xlabel("Global Epoch Index")
+    plt.ylabel("Accuracy (%)")
+    plt.title(title)
+    plt.xlim(0, global_last_epoch + 1)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=8, ncol=2, frameon=False)
+
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_task_wise_accuracy(
+    histories_per_task,
+    epochs_per_task,
+    tasks,
+    kind="train",   # "train" or "test"
+    title="Task-wise Accuracy over Global Epochs",
+    save_path=None
+):
+    """
+    One line per task. A task's line starts at the first global epoch where
+    it is introduced and continues through the end of training.
+
+    - kind="test" uses the exact per-task test accuracy already evaluated by
+      eval_seen_per_task (stored as history["test_accs_seen"]).
+    - kind="train" has no direct per-task training loader, so it is
+      approximated as the mean of that task's member labels' per-epoch
+      training accuracy (history["train_acc_per_class"]).
+    """
+    offsets = _global_offsets(epochs_per_task)
+    global_last_epoch = sum(epochs_per_task)
+    num_tasks = len(tasks)
+
+    xs = [[] for _ in range(num_tasks)]
+    ys = [[] for _ in range(num_tasks)]
+
+    if kind == "test":
+        for t, hist in enumerate(histories_per_task):
+            start = offsets[t]
+            for ep_idx, accs_seen in enumerate(hist.get("test_accs_seen", [])):
+                if accs_seen is None:
+                    continue
+                xg = start + ep_idx + 1
+                for k, acc_k in enumerate(accs_seen):
+                    xs[k].append(xg)
+                    ys[k].append(acc_k)
+    elif kind == "train":
+        for t, hist in enumerate(histories_per_task):
+            start = offsets[t]
+            for ep_idx, class_acc in enumerate(hist.get("train_acc_per_class", [])):
+                if not class_acc:
+                    continue
+                xg = start + ep_idx + 1
+                for k, labels in enumerate(tasks):
+                    accs = [class_acc[lbl] for lbl in labels if lbl in class_acc]
+                    if not accs:
+                        continue
+                    xs[k].append(xg)
+                    ys[k].append(float(np.mean(accs)))
+    else:
+        raise ValueError(f"Unknown kind: {kind!r}")
+
+    plt.figure(figsize=(10, 5))
+    for k in range(num_tasks):
+        if not xs[k]:
+            continue
+        plt.plot(xs[k], ys[k], linewidth=2, label=f"Task {k} {tasks[k]}")
+
+    plt.xlabel("Global Epoch Index")
+    plt.ylabel("Accuracy (%)")
+    plt.title(title)
+    plt.xlim(0, global_last_epoch + 1)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=9, ncol=2, frameon=False)
+
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_loss_curves(
+    histories_per_task,
+    epochs_per_task,
+    keys,
+    title="Loss over Global Epochs",
+    ylabel="Loss",
+    save_path=None
+):
+    """
+    One continuous line per history key (e.g. "rec", "feat_reg", or
+    "ce", "logit_reg", "test_ce_mean"), stitched across tasks using the
+    same global-epoch-index convention as the accuracy plots. Unlike the
+    label/task-wise accuracy plots, these are single scalars per epoch, not
+    broken out per task -- so each key is one line for the whole run.
+    None entries (e.g. test_ce_mean before --log_every_epoch is enabled)
+    are skipped rather than plotted as gaps.
+    """
+    offsets = _global_offsets(epochs_per_task)
+    global_last_epoch = sum(epochs_per_task)
+
+    plt.figure(figsize=(10, 5))
+    for key in keys:
+        xs, ys = [], []
+        for t, hist in enumerate(histories_per_task):
+            start = offsets[t]
+            for ep_idx, v in enumerate(hist.get(key, [])):
+                if v is None:
+                    continue
+                xs.append(start + ep_idx + 1)
+                ys.append(v)
+        if xs:
+            plt.plot(xs, ys, linewidth=1.8, label=key)
+
+    plt.xlabel("Global Epoch Index")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.xlim(0, global_last_epoch + 1)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=9, frameon=False)
+
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
+        plt.close()
+    else:
+        plt.show()
 
 
 def plotGP_per_class_metrics_over_tasks(
@@ -620,25 +905,32 @@ def plotGP_total_accuracy_over_tasks(
 
 
 
-def extract_head_only_history(history_2stage):
+def extract_stage_history(history_2stage, stage):
     """
-    Keep ONLY the epochs where stage == "Head",
-    preserving all keys consistently.
+    Keep ONLY the epochs where history_2stage["stage"] == `stage`
+    ("AE" or "Head"), preserving all keys consistently.
     """
+    mask = [s == stage for s in history_2stage.get("stage", [])]
 
-    mask = [s == "Head" for s in history_2stage.get("stage", [])]
-
-    head_hist = {}
+    stage_hist = {}
 
     for key, values in history_2stage.items():
         # Only process list-like entries with same length as stage
         if isinstance(values, list) and len(values) == len(mask):
-            head_hist[key] = [v for v, m in zip(values, mask) if m]
+            stage_hist[key] = [v for v, m in zip(values, mask) if m]
         else:
             # keep non-epoch keys untouched (rare case)
-            head_hist[key] = values
+            stage_hist[key] = values
 
-    return head_hist
+    return stage_hist
+
+
+def extract_head_only_history(history_2stage):
+    return extract_stage_history(history_2stage, "Head")
+
+
+def extract_ae_only_history(history_2stage):
+    return extract_stage_history(history_2stage, "AE")
 
 # =============== Main Driver ===============
 
@@ -770,6 +1062,8 @@ def main():
         # eval_fn = (lambda m: eval_seen_mean(m, seen_test_loaders, device)) if args.log_every_epoch else None
         # track per-task instead of mean:
         eval_fn = (lambda m: eval_seen_per_task(m, seen_test_loaders, device)) if args.log_every_epoch else None
+        eval_fn_class = (lambda m: eval_seen_per_class(m, seen_test_loaders, device)) if args.log_every_epoch else None
+        eval_fn_ce = (lambda m: eval_seen_ce_mean(m, seen_test_loaders, device)) if args.log_every_epoch else None
 
 
         # history = train_2_stage(
@@ -838,7 +1132,9 @@ def main():
             # -------- Common --------
             device=device,
             grad_clip=None,
-            eval_fn=eval_fn
+            eval_fn=eval_fn,
+            eval_fn_class=eval_fn_class,
+            eval_fn_ce=eval_fn_ce
         )
         # ----------------------------------------------
 
@@ -856,6 +1152,8 @@ def main():
         # For 2 stage train:
         head_histories_per_task = [extract_head_only_history(h) for h in histories_per_task]
         epochs_head_per_task = [len(h["train_acc"]) for h in head_histories_per_task]
+        ae_histories_per_task = [extract_ae_only_history(h) for h in histories_per_task]
+        epochs_ae_per_task = [len(h["rec"]) for h in ae_histories_per_task]
         test_end_accs.append(res["accuracy"])
 
 
@@ -873,11 +1171,16 @@ def main():
             keep_frac=0.95 #NOTE: keep top 95% confident samples per class (for GP training)
         )
         print(f"[Task {t}] Wrote CSVs to: {task_dir}")
-        data_tr_path = csv_paths["train_feat_csv"]   
-        data_ts_path = csv_paths["test_feat_csv"]  
+        data_tr_path = csv_paths["train_feat_csv"]
+        data_ts_path = csv_paths["test_feat_csv"]
+
+        save_decode_diagnostics(model, tr_loader, out_dir=task_dir, device=device, n_samples=2)
+        print(f"[Task {t}] Wrote decode diagnostic images to: {task_dir}")
 
         # Evaluate across all seen tasks
         accs_seen = evaluate_across_seen_tasks(model, seen_test_loaders, device)
+        class_accs_seen = eval_seen_per_class(model, seen_test_loaders, device)
+        class_accs_seen = {k: v * 100 for k, v in class_accs_seen.items()}
         mean_seen = float(np.mean(accs_seen)) if len(accs_seen) > 0 else float("nan")
         print("Accuracies on seen tasks:")
         for i, a in enumerate(accs_seen):
@@ -902,10 +1205,13 @@ def main():
             "train_rec_ae": history["rec"][idx_ae],
             "train_feat_reg_ae": history["feat_reg"][idx_ae],
             "train_acc": history["train_acc"][idx_head],
+            "train_acc_per_class": history["train_acc_per_class"][idx_head],
             "test_ce_loss": res["ce_loss"],
+            "test_ce_mean": history["test_ce_mean"][idx_head],
             "test_rec_loss": res.get("rec_loss", ""),
             "test_acc_mean": mean_seen,
-            "test_accs_seen": accs_seen
+            "test_accs_seen": accs_seen,
+            "test_acc_per_class": class_accs_seen,
         }
         # for i in range(len(tasks)):
         #     row_end[f"acc_task{i}"] = (accs_seen[i] if i < len(accs_seen) else "")
@@ -928,8 +1234,11 @@ def main():
                     "train_feat_reg_ae": history["feat_reg"][ep_idx] if stage_tag == "AE" else "", # AE feature preservation
                     "train_logit_reg_head": history["logit_reg"][ep_idx] if stage_tag == "Head" else "", # Head logit preservation
                     "train_acc": history["train_acc"][ep_idx], # this is overall train acc (training classification accuracy average of seen classes)
+                    "train_acc_per_class": history.get("train_acc_per_class", [None])[ep_idx],
                     "test_acc_mean": history.get("test_acc_mean", [None])[ep_idx],
                     "test_accs_seen": history.get("test_accs_seen", [None])[ep_idx],
+                    "test_acc_per_class": history.get("test_acc_per_class", [None])[ep_idx],
+                    "test_ce_mean": history.get("test_ce_mean", [None])[ep_idx],
                     "test_ce_loss": "", # I didn't track this per epoch
                     "test_rec_loss": "",
                 }
@@ -1085,6 +1394,58 @@ def main():
         save_path_prefix=os.path.join(run_dir, "acc_over_time_head_only")
     )
 
+    # Label-wise and task-wise breakdowns (train + test), head-only
+    plot_label_wise_accuracy(
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        tasks=tasks,
+        key="train_acc_per_class",
+        title="MNIST Continual: Label-wise Training Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_per_label_train.png")
+    )
+    plot_label_wise_accuracy(
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        tasks=tasks,
+        key="test_acc_per_class",
+        title="MNIST Continual: Label-wise Test Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_per_label_test.png")
+    )
+    plot_task_wise_accuracy(
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        tasks=tasks,
+        kind="train",
+        title="MNIST Continual: Task-wise Training Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_per_task_train.png")
+    )
+    plot_task_wise_accuracy(
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        tasks=tasks,
+        kind="test",
+        title="MNIST Continual: Task-wise Test Accuracy vs Global Epochs",
+        save_path=os.path.join(run_dir, "acc_per_task_test.png")
+    )
+
+    # Per-process loss curves
+    plot_loss_curves(
+        histories_per_task=ae_histories_per_task,
+        epochs_per_task=epochs_ae_per_task,
+        keys=["rec", "feat_reg"],
+        title="MNIST Continual: AE Stage-1 Loss vs Global Epochs",
+        ylabel="Loss",
+        save_path=os.path.join(run_dir, "loss_ae_stage1.png")
+    )
+    plot_loss_curves(
+        histories_per_task=head_histories_per_task,
+        epochs_per_task=epochs_head_per_task,
+        keys=["ce", "logit_reg", "test_ce_mean"],
+        title="MNIST Continual: Head Stage-2 Loss vs Global Epochs (train ce/logit_reg + held-out test ce)",
+        ylabel="Loss",
+        save_path=os.path.join(run_dir, "loss_head_stage2.png")
+    )
+
     if not skip_GP:
         # Plot GP metrics
         plotGP_per_class_metrics_over_tasks(
@@ -1099,6 +1460,21 @@ def main():
             task_ids=list(range(len(tasks))),
             save_path=os.path.join(run_dir, "gp_total_accuracy.png")
         )
+
+        # GP surrogate loss: held-out val MSE of the full-data fit vs. the
+        # distilled (Z_t, Y_Z_t) reconstruction actually persisted/reloaded
+        # (mse_distilled is NA for gplite runs -- see utils.R::train_GP_v3)
+        try:
+            plotGP_per_class_metrics_over_tasks(
+                run_dir=run_dir,
+                task_ids=list(range(len(tasks))),
+                metrics=("mse_full", "mse_distilled"),
+                filename="gp_train_metrics.csv",
+                title="GP surrogate loss (val MSE): full vs. distilled",
+                save_path=os.path.join(run_dir, "gp_train_mse.png")
+            )
+        except FileNotFoundError:
+            print("[Plot] gp_train_metrics.csv not found for one or more tasks (e.g. --skip_GP_train) -- skipping GP surrogate loss plot.")
 
 
 if __name__ == "__main__":

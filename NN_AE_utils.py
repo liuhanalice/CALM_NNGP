@@ -18,6 +18,26 @@ def _make_optimizer(model, lr):
     params = [p for p in model.parameters() if p.requires_grad]
     return torch.optim.Adam(params, lr=lr)
 
+
+def _accumulate_class_counts(class_correct, class_total, preds, y):
+    """In-place accumulate per-label correct/total counts for one batch."""
+    preds_np = preds.detach().cpu().numpy()
+    y_np = y.detach().cpu().numpy()
+    for lbl in np.unique(y_np):
+        lbl = int(lbl)
+        mask = y_np == lbl
+        class_total[lbl] = class_total.get(lbl, 0) + int(mask.sum())
+        class_correct[lbl] = class_correct.get(lbl, 0) + int((preds_np[mask] == lbl).sum())
+
+
+def _class_acc_dict(class_correct, class_total):
+    """Convert per-label correct/total counts into per-label accuracy (%)."""
+    return {
+        lbl: 100.0 * class_correct[lbl] / class_total[lbl]
+        for lbl in class_total
+        if class_total[lbl] > 0
+    }
+
 def _set_requires_grad(module, flag: bool):
     for p in module.parameters():
         p.requires_grad = flag
@@ -500,6 +520,8 @@ def train_2_stage_class_aware(
     device=None,
     grad_clip=None,
     eval_fn=None,
+    eval_fn_class=None,
+    eval_fn_ce=None,
 ):
     """
     Two-Stage Class-Incremental Training
@@ -572,9 +594,12 @@ def train_2_stage_class_aware(
         "feat_reg": [],
         "ce": [],
         "logit_reg": [],
-        "train_acc": [],            
+        "train_acc": [],
         "test_accs_seen": [],       # list-of-lists per epoch (if eval_fn provided)
         "test_acc_mean": [],        # scalar mean (if eval_fn provided)
+        "train_acc_per_class": [],  # per-epoch dict {label: acc%} over labels present in trloader
+        "test_acc_per_class": [],   # per-epoch dict {label: acc%} (if eval_fn_class provided)
+        "test_ce_mean": [],         # per-epoch scalar CE loss pooled over all seen-task test data (if eval_fn_ce provided)
     }
 
     # ----------------
@@ -589,6 +614,7 @@ def train_2_stage_class_aware(
         total_loss = total_rec = total_feat = 0.0
         correct = total = 0
         n_batches = 0
+        class_correct, class_total = {}, {}
 
         for x, y in trloader:
             x, y = x.to(device), y.to(device)
@@ -636,6 +662,7 @@ def train_2_stage_class_aware(
             preds = logits.argmax(dim=1)
             correct += (preds == y).sum().item()
             total += y.size(0)
+            _accumulate_class_counts(class_correct, class_total, preds, y)
 
         # Evaluation
         test_accs_seen = None
@@ -644,6 +671,12 @@ def train_2_stage_class_aware(
             test_accs_seen = eval_fn(model)  # list of per-task accs
             test_accs_seen = [acc * 100 for acc in test_accs_seen]
             test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+
+        test_acc_per_class = None
+        if eval_fn_class is not None:
+            test_acc_per_class = {k: v * 100 for k, v in eval_fn_class(model).items()}
+
+        test_ce_mean = eval_fn_ce(model) if eval_fn_ce is not None else None
 
         history["stage"].append("AE")
         history["epoch"].append(ep + 1)
@@ -655,6 +688,9 @@ def train_2_stage_class_aware(
         history["train_acc"].append(100.0 * correct / max(total, 1))
         history["test_accs_seen"].append(test_accs_seen)
         history["test_acc_mean"].append(test_acc_mean)
+        history["train_acc_per_class"].append(_class_acc_dict(class_correct, class_total))
+        history["test_acc_per_class"].append(test_acc_per_class)
+        history["test_ce_mean"].append(test_ce_mean)
 
         print(f"[Stage1/AE] ep {ep+1}/{epochs_stage1} | loss {history['loss'][-1]:.4f} "
               f"| rec {history['rec'][-1]:.4f} | feat {history['feat_reg'][-1]:.4f} "
@@ -672,6 +708,7 @@ def train_2_stage_class_aware(
         total_loss = total_ce = total_logit = 0.0
         correct = total = 0
         n_batches = 0
+        class_correct, class_total = {}, {}
 
         for x, y in trloader:
             x, y = x.to(device), y.to(device)
@@ -752,6 +789,7 @@ def train_2_stage_class_aware(
             preds = logits.argmax(dim=1)
             correct += (preds == y).sum().item()
             total += y.size(0)
+            _accumulate_class_counts(class_correct, class_total, preds, y)
 
         # Evaluation
         test_accs_seen = None
@@ -760,6 +798,12 @@ def train_2_stage_class_aware(
             test_accs_seen = eval_fn(model)
             test_accs_seen = [acc * 100 for acc in test_accs_seen]
             test_acc_mean = float(np.mean(test_accs_seen)) if len(test_accs_seen) else None
+
+        test_acc_per_class = None
+        if eval_fn_class is not None:
+            test_acc_per_class = {k: v * 100 for k, v in eval_fn_class(model).items()}
+
+        test_ce_mean = eval_fn_ce(model) if eval_fn_ce is not None else None
 
         history["stage"].append("Head")
         history["epoch"].append(ep + 1)
@@ -771,6 +815,9 @@ def train_2_stage_class_aware(
         history["train_acc"].append(100.0 * correct / max(total, 1))
         history["test_accs_seen"].append(test_accs_seen)
         history["test_acc_mean"].append(test_acc_mean)
+        history["train_acc_per_class"].append(_class_acc_dict(class_correct, class_total))
+        history["test_acc_per_class"].append(test_acc_per_class)
+        history["test_ce_mean"].append(test_ce_mean)
 
         print(f"[Stage2/Head] ep {ep+1}/{epochs_stage2} | loss {history['loss'][-1]:.4f} "
               f"| ce {history['ce'][-1]:.4f} | logit {history['logit_reg'][-1]:.4f} "

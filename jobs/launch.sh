@@ -8,7 +8,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --mem-per-gpu=32GB
-#SBATCH --time=12:00:00
+#SBATCH --time=18:00:00
 #SBATCH --output=/home/lhalice/CALM_NNGP/jobs/logs/launch_%j.log
 
 module purge

@@ -34,6 +34,23 @@ if [ ! -d "$run_root" ]; then
   exit 1
 fi
 
+if ! command -v Rscript >/dev/null 2>&1; then
+  # Best-effort: same env setup as jobs/launch.sh. Harmless no-ops if this
+  # isn't that cluster (module/conda absent, or NNGP env not there).
+  command -v module >/dev/null 2>&1 && module load R/4.5.1 2>/dev/null
+  if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+    conda activate NNGP 2>/dev/null
+  fi
+fi
+
+if ! command -v Rscript >/dev/null 2>&1; then
+  echo "Error: Rscript not found on PATH. Load your R environment first, e.g.:" >&2
+  echo "  module load R/4.5.1 && conda activate NNGP" >&2
+  exit 1
+fi
+
 config_json="$run_root/config.json"
 default_gp_package="laGP"
 default_score_threshold="0.9"

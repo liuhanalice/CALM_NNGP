@@ -972,6 +972,15 @@ def main():
                         help="Minimum GP score for a sample to be kept in GP_sample.R.")
     parser.add_argument("--GP_max_resample_iter", type=int, default=50,
                         help="Maximum resample iterations per class in GP_sample.R.")
+    parser.add_argument("--GP_sample_mode", type=str, default="class_dist",
+                        choices=["class_dist", "inducing"],
+                        help="GP_sample.R candidate source: class_dist (N(center, cov)) or "
+                             "inducing (Gaussian around true-class inducing points).")
+    parser.add_argument("--GP_inducing_score_min", type=float, default=None,
+                        help="inducing mode: min GP score for an inducing point to count as true-class "
+                             "(default: GP_sample.R default, 0.5).")
+    parser.add_argument("--GP_inducing_noise_scale", type=float, default=0.1,
+                        help="inducing mode: perturbation covariance = scale^2 * class covariance.")
 
     parser.add_argument("--skip_GP", action="store_true",
                         help="Skip all GP steps; use random feature subset as replay buffer.")
@@ -1264,7 +1273,11 @@ def main():
             "--score_threshold",    str(args.GP_score_threshold),
             "--max_resample_iter",  str(args.GP_max_resample_iter),
             "--seed",               str(args.seed),
+            "--sample_mode",        args.GP_sample_mode,
+            "--inducing_noise_scale", str(args.GP_inducing_noise_scale),
         ]
+        if args.GP_inducing_score_min is not None:
+            r_args_sample += ["--inducing_score_min", str(args.GP_inducing_score_min)]
 
         if skip_GP:
             # Skip all GP steps; write a random feature subset as replay_points.csv

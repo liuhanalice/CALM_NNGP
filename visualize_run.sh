@@ -15,8 +15,8 @@
 #   ./visualize_run.sh runs/run_20260824_122705 --n_real=500
 #
 # Env overrides:
-#   N_VIS=1000 N_VIS_OVERLAP=500 GP_PACKAGE=laGP SCORE_THRESHOLD=0.9 \
-#     ./visualize_run.sh runs/run_20260824_122705
+  # N_VIS=1000 N_VIS_OVERLAP=500 GP_PACKAGE=laGP SCORE_THRESHOLD=0.9 \
+    # ./visualize_run.sh runs_mnist_continual/run_20260917_180345
 
 set -euo pipefail
 

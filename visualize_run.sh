@@ -21,7 +21,8 @@
 #   ./visualize_run.sh runs/run_20260824_122705 --n_real=500
 #
 # Env overrides:
-  # N_VIS=1000 N_VIS_OVERLAP=500 GP_PACKAGE=laGP SCORE_THRESHOLD=0.9 \
+  # N_VIS=1000 N_VIS_OVERLAP=500 N_REAL_TRAJ=500 N_TEST=500 GP_PACKAGE=laGP \
+  #   SCORE_THRESHOLD=0.9 TARGET_SCORE_THRESHOLD=0.5 \
     # ./visualize_run.sh runs_mnist_continual/run_20260917_180345
 
 set -euo pipefail
@@ -72,6 +73,7 @@ score_threshold="${SCORE_THRESHOLD:-$default_score_threshold}"
 n_vis="${N_VIS:-1000}"
 n_vis_overlap="${N_VIS_OVERLAP:-500}"
 n_real_traj="${N_REAL_TRAJ:-500}"
+n_test_traj="${N_TEST:-500}"
 target_score_threshold="${TARGET_SCORE_THRESHOLD:-0.5}"
 
 task_dirs=("$run_root"/task*/)
@@ -126,7 +128,8 @@ else
   for cls in $all_classes; do
     echo "=== trajectory for class $cls (target_score_threshold: $target_score_threshold) ==="
     Rscript GP_visualize_trajectory.R -r "$run_root" --class "$cls" \
-      --n_real "$n_real_traj" --target_score_threshold "$target_score_threshold" \
+      --n_real "$n_real_traj" --n_test "$n_test_traj" \
+      --target_score_threshold "$target_score_threshold" \
       --out_path "$run_root" \
       "${extra_args[@]}"
   done

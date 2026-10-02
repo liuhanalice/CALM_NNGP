@@ -489,6 +489,10 @@ facet_colors <- c(replay = "steelblue", test = "darkgreen", orig_now = "purple",
 facet_shapes <- c(replay = 16, test = 16, orig_now = 16, train_now = 16, inducing = 4)
 facet_size   <- function(ty) if (ty == "inducing") 2.2 else 1.6
 facet_stroke <- function(ty) if (ty == "inducing") 1.0 else 0.5
+# orig_now / train_now are dense clouds -- draw them lighter so the layers
+# beneath and the inducing points on top stay readable
+dense_alpha  <- 0.3
+layer_alpha  <- function(ty) if (ty %in% c("orig_now", "train_now")) dense_alpha else 0.85
 
 pdf_path <- paste0(out_path, "/GP_visualize_trajectory_c", cls, ".pdf")
 pdf(file = pdf_path, width = 9, height = 7)
@@ -511,7 +515,7 @@ for (ty in present_types) {
   sub_pts <- subset(plot_df, type == ty)
   p1 <- p1 +
     geom_point(data = sub_pts, aes(x = UMAP1, y = UMAP2, fill = task, shape = type),
-               color = "black", size = 2.2, stroke = 0.3, alpha = 0.85)
+               color = "black", size = 2.2, stroke = 0.3, alpha = layer_alpha(ty))
   centroids <- aggregate(cbind(UMAP1, UMAP2) ~ task, data = sub_pts, FUN = mean)
   centroids <- centroids[order(centroids$task), ]
   p1 <- p1 +
@@ -546,7 +550,7 @@ if (nrow(facet_df) > 0) {
   for (ty in intersect(main_layer_types, unique(as.character(facet_df$type)))) {
     p2 <- p2 +
       geom_point(data = subset(facet_df, type == ty), aes(x = UMAP1, y = UMAP2, color = type, shape = type),
-                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = 0.85)
+                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = layer_alpha(ty))
   }
   p2 <- p2 +
     facet_wrap(~ task, labeller = label_both) +
@@ -585,7 +589,7 @@ for (ty in intersect(main_layer_types, unique(as.character(plot_df_pca$type)))) 
   sub_pts <- subset(plot_df_pca, type == ty)
   p1_pca <- p1_pca +
     geom_point(data = sub_pts, aes(x = PC1, y = PC2, fill = task, shape = type),
-               color = "black", size = 2.2, stroke = 0.3, alpha = 0.85)
+               color = "black", size = 2.2, stroke = 0.3, alpha = layer_alpha(ty))
   centroids <- aggregate(cbind(PC1, PC2) ~ task, data = sub_pts, FUN = mean)
   centroids <- centroids[order(centroids$task), ]
   p1_pca <- p1_pca +
@@ -617,7 +621,7 @@ if (nrow(facet_df_pca) > 0) {
   for (ty in intersect(main_layer_types, unique(as.character(facet_df_pca$type)))) {
     p2_pca <- p2_pca +
       geom_point(data = subset(facet_df_pca, type == ty), aes(x = PC1, y = PC2, color = type, shape = type),
-                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = 0.85)
+                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = layer_alpha(ty))
   }
   p2_pca <- p2_pca +
     facet_wrap(~ task, labeller = label_both) +
@@ -680,7 +684,7 @@ if (nrow(sel_spread) > 0) {
 overlap_types  <- c("orig_now", "train_now", "prev_inducing_now")  # draw order: bottom -> top
 overlap_colors <- c(orig_now = "purple", train_now = "darkorange", prev_inducing_now = "red")
 overlap_shapes <- c(orig_now = 16, train_now = 16, prev_inducing_now = 4)  # solid circle, solid circle, cross
-overlap_alpha  <- c(orig_now = 0.4, train_now = 0.4, prev_inducing_now = 0.9)
+overlap_alpha  <- c(orig_now = dense_alpha, train_now = dense_alpha, prev_inducing_now = 0.9)
 overlap_size   <- c(orig_now = 1.8, train_now = 1.8, prev_inducing_now = 2.5)
 
 overlap_present <- intersect(overlap_types, unique(as.character(plot_df$type)))

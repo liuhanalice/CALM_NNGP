@@ -45,6 +45,9 @@
 # of anything replay-specific; comparing "test" against "inducing"/"replay"
 # within the same task shows whether the training-side data still covers
 # what real data for this class actually looks like right now.
+# (--include_test is now off by default: test turned out to track orig_now
+# closely, so pages 1-4 show train_now -- task t's actual train_feat.csv rows
+# for this class, the pool the inducing points are sampled from -- instead.)
 #
 # "true" itself, though, is a STATIC reference: it's the original real
 # training images encoded ONCE, by the introduction task's model, then
@@ -120,8 +123,8 @@ option_list <- list(
               help = "Min Y_Z_t pseudo-target to keep a Z_t row as target-class (laGP only; excludes X_otc other-class anchor rows) [default: %default]"),
   make_option(c("--include_replay"),       type = "logical",   default = TRUE,
               help = "Overlay each task's GP-sampled replay buffer (replay_points.csv) [default: %default]"),
-  make_option(c("--include_test"),         type = "logical",   default = TRUE,
-              help = "Overlay each task's REAL held-out test data for this class (test_feat.csv, never replayed) [default: %default]"),
+  make_option(c("--include_test"),         type = "logical",   default = FALSE,
+              help = "Overlay each task's REAL held-out test data for this class (test_feat.csv, never replayed); off by default since it tracks orig_now closely -- train_now is shown in its place [default: %default]"),
   make_option(c("--n_test"),               type = "numeric",   default = 500,
               help = "Real test points per task to sample for plotting/stats [default: %default]"),
   make_option(c("--include_orig_reencoded"), type = "logical", default = TRUE,
@@ -475,6 +478,18 @@ plot_df <- data.frame(UMAP1 = proj[, 1], UMAP2 = proj[, 2],
                        type = factor(type_col, levels = all_type_levels),
                        task = task_col)
 
+# Layers drawn on pages 1-4, bottom -> top (inducing last so it always renders on top)
+main_layer_types <- c("replay", "test", "orig_now", "train_now", "inducing")
+# Legend labels for pages 1-4; inducing = the Z_t saved in GPparams_c<class>.rds,
+# which GP_sample.R samples next task's replay around
+type_labels <- function(b) ifelse(b == "inducing", "inducing saved for next task", b)
+# Pages 2/4: inducing as an opaque red cross, everything else solid circles
+facet_colors <- c(replay = "steelblue", test = "darkgreen", orig_now = "purple",
+                  train_now = "darkorange", inducing = "red")
+facet_shapes <- c(replay = 16, test = 16, orig_now = 16, train_now = 16, inducing = 4)
+facet_size   <- function(ty) if (ty == "inducing") 2.2 else 1.6
+facet_stroke <- function(ty) if (ty == "inducing") 1.0 else 0.5
+
 pdf_path <- paste0(out_path, "/GP_visualize_trajectory_c", cls, ".pdf")
 pdf(file = pdf_path, width = 9, height = 7)
 
@@ -486,8 +501,7 @@ p1 <- ggplot() +
                aes(x = UMAP1, y = UMAP2), level = 0.95, color = "grey50",
                linewidth = 0.8, linetype = "dashed")
 
-# draw replay first, then test, then orig_now, then inducing last so inducing points always render on top
-present_types <- intersect(c("replay", "test", "orig_now", "inducing"), unique(as.character(plot_df$type)))
+present_types <- intersect(main_layer_types, unique(as.character(plot_df$type)))
 path_colors <- c(inducing = "firebrick", replay = "steelblue", test = "darkgreen", orig_now = "purple",
                   train_now = "darkorange", prev_inducing_now = "brown")
 shape_values <- c(inducing = 21, replay = 24, test = 22, orig_now = 23,
@@ -508,10 +522,10 @@ for (ty in present_types) {
 
 p1 <- p1 +
   scale_fill_viridis_c(name = "task", option = "plasma") +
-  scale_shape_manual(values = shape_values, name = "type") +
+  scale_shape_manual(values = shape_values, labels = type_labels, name = "type") +
   labs(title = paste0("Class ", cls, ": true data (grey, task", intro_task_num,
                        ") vs. selected points across later tasks"),
-       subtitle = "arrow = path of each task's centroid (red=inducing, blue=replay, green=real test, purple=original images re-encoded now); shared unsupervised UMAP",
+       subtitle = "arrow = path of each task's centroid (red=inducing, blue=replay, orange=current training data, purple=original images re-encoded now); shared unsupervised UMAP",
        x = "UMAP1", y = "UMAP2") +
   theme_minimal()
 print(p1)
@@ -529,15 +543,15 @@ if (nrow(facet_df) > 0) {
   }))
   p2 <- ggplot() +
     geom_point(data = true_bg, aes(x = UMAP1, y = UMAP2), color = "grey80", size = 0.8, alpha = 0.4)
-  # draw replay first, then test, then orig_now, inducing last so inducing points always render on top
-  for (ty in intersect(c("replay", "test", "orig_now", "inducing"), unique(as.character(facet_df$type)))) {
+  for (ty in intersect(main_layer_types, unique(as.character(facet_df$type)))) {
     p2 <- p2 +
-      geom_point(data = subset(facet_df, type == ty), aes(x = UMAP1, y = UMAP2, color = type),
-                 size = 1.6, alpha = 0.85)
+      geom_point(data = subset(facet_df, type == ty), aes(x = UMAP1, y = UMAP2, color = type, shape = type),
+                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = 0.85)
   }
   p2 <- p2 +
     facet_wrap(~ task, labeller = label_both) +
-    scale_color_manual(values = path_colors) +
+    scale_color_manual(values = facet_colors, labels = type_labels, name = "type") +
+    scale_shape_manual(values = facet_shapes, labels = type_labels, name = "type") +
     labs(title = paste0("Class ", cls, ": selected points by task (grey = true data at introduction)"),
          x = "UMAP1", y = "UMAP2") +
     theme_minimal()
@@ -567,7 +581,7 @@ p1_pca <- ggplot() +
                aes(x = PC1, y = PC2), level = 0.95, color = "grey50",
                linewidth = 0.8, linetype = "dashed")
 
-for (ty in intersect(c("replay", "test", "orig_now", "inducing"), unique(as.character(plot_df_pca$type)))) {
+for (ty in intersect(main_layer_types, unique(as.character(plot_df_pca$type)))) {
   sub_pts <- subset(plot_df_pca, type == ty)
   p1_pca <- p1_pca +
     geom_point(data = sub_pts, aes(x = PC1, y = PC2, fill = task, shape = type),
@@ -582,10 +596,10 @@ for (ty in intersect(c("replay", "test", "orig_now", "inducing"), unique(as.char
 
 p1_pca <- p1_pca +
   scale_fill_viridis_c(name = "task", option = "plasma") +
-  scale_shape_manual(values = shape_values, name = "type") +
+  scale_shape_manual(values = shape_values, labels = type_labels, name = "type") +
   labs(title = paste0("Class ", cls, ": true data (grey, task", intro_task_num,
                        ") vs. selected points across later tasks (linear PCA)"),
-       subtitle = "arrow = path of each task's centroid (red=inducing, blue=replay, green=real test, purple=original images re-encoded now); shared linear PCA -- distances are real, unlike UMAP",
+       subtitle = "arrow = path of each task's centroid (red=inducing, blue=replay, orange=current training data, purple=original images re-encoded now); shared linear PCA -- distances are real, unlike UMAP",
        x = pc1_lab, y = pc2_lab) +
   theme_minimal()
 print(p1_pca)
@@ -600,14 +614,15 @@ if (nrow(facet_df_pca) > 0) {
   }))
   p2_pca <- ggplot() +
     geom_point(data = true_bg_pca, aes(x = PC1, y = PC2), color = "grey80", size = 0.8, alpha = 0.4)
-  for (ty in intersect(c("replay", "test", "orig_now", "inducing"), unique(as.character(facet_df_pca$type)))) {
+  for (ty in intersect(main_layer_types, unique(as.character(facet_df_pca$type)))) {
     p2_pca <- p2_pca +
-      geom_point(data = subset(facet_df_pca, type == ty), aes(x = PC1, y = PC2, color = type),
-                 size = 1.6, alpha = 0.85)
+      geom_point(data = subset(facet_df_pca, type == ty), aes(x = PC1, y = PC2, color = type, shape = type),
+                 size = facet_size(ty), stroke = facet_stroke(ty), alpha = 0.85)
   }
   p2_pca <- p2_pca +
     facet_wrap(~ task, labeller = label_both) +
-    scale_color_manual(values = path_colors) +
+    scale_color_manual(values = facet_colors, labels = type_labels, name = "type") +
+    scale_shape_manual(values = facet_shapes, labels = type_labels, name = "type") +
     labs(title = paste0("Class ", cls, ": selected points by task (grey = true data at introduction, linear PCA)"),
          x = pc1_lab, y = pc2_lab) +
     theme_minimal()

@@ -13,6 +13,16 @@
 #   <run_root>/GP_visualize_trajectory_c<class>.pdf
 #   <run_root>/GP_trajectory_spread_c<class>.csv
 #
+# Before each class's trajectory plot, runs reencode_true_across_tasks.py if
+# its outputs (GP_original_reencoded_c<class>.csv,
+# GP_prev_inducing_reencoded_c<class>.csv) are missing. That script reads the
+# task<t>/Zt_target_c<class>.csv files exported by GP_visualize_trajectory.R,
+# so if those are missing too, the order is: trajectory (export Zt_target) ->
+# reencode -> trajectory again (final PDF). The reencode step needs the
+# python env with torch, <run_root>/checkpoints/model_task<t>.pt and MNIST
+# under ./data; if it fails, the trajectory plot is still made without those
+# two layers.
+#
 # Usage:
 #   ./visualize_run.sh runs/run_20260824_122705 [extra Rscript args...]
 #
@@ -22,8 +32,11 @@
 #
 # Env overrides:
   # N_VIS=1000 N_VIS_OVERLAP=500 N_REAL_TRAJ=500 N_TEST=500 GP_PACKAGE=laGP \
-  #   SCORE_THRESHOLD=0.9 TARGET_SCORE_THRESHOLD=0.5 \
+  #   SCORE_THRESHOLD=0.9 TARGET_SCORE_THRESHOLD=0.5 F_SIZE=16 PYTHON=python \
+  #   FORCE_REENCODE=1 SKIP_REENCODE=1 \
     # ./visualize_run.sh runs_mnist_continual/run_20260917_180345
+#   FORCE_REENCODE=1 reruns reencode_true_across_tasks.py even if its outputs
+#   exist; SKIP_REENCODE=1 never runs it.
 
 set -euo pipefail
 
@@ -61,11 +74,14 @@ fi
 config_json="$run_root/config.json"
 default_gp_package="laGP"
 default_score_threshold="0.9"
+default_f_size="16"
 if [ -f "$config_json" ] && command -v jq >/dev/null 2>&1; then
   cfg_gp_package=$(jq -r '.GP_package // empty' "$config_json")
   cfg_score_threshold=$(jq -r '.GP_score_threshold // empty' "$config_json")
+  cfg_f_size=$(jq -r '.f_size // empty' "$config_json")
   [ -n "$cfg_gp_package" ] && default_gp_package="$cfg_gp_package"
   [ -n "$cfg_score_threshold" ] && default_score_threshold="$cfg_score_threshold"
+  [ -n "$cfg_f_size" ] && default_f_size="$cfg_f_size"
 fi
 
 gp_package="${GP_PACKAGE:-$default_gp_package}"
@@ -75,6 +91,8 @@ n_vis_overlap="${N_VIS_OVERLAP:-500}"
 n_real_traj="${N_REAL_TRAJ:-500}"
 n_test_traj="${N_TEST:-500}"
 target_score_threshold="${TARGET_SCORE_THRESHOLD:-0.5}"
+f_size="${F_SIZE:-$default_f_size}"
+python_bin="${PYTHON:-python}"
 
 task_dirs=("$run_root"/task*/)
 if [ ! -d "${task_dirs[0]}" ]; then
@@ -104,14 +122,14 @@ for task_dir in "${task_dirs[@]}"; do
     --existing_classes "$classes" --GP_package "$gp_package" \
     --score_threshold "$score_threshold" --n_vis "$n_vis" \
     --data_tr "$train_feat" \
-    "${extra_args[@]}"
+    ${extra_args[@]+"${extra_args[@]}"}
 
   Rscript GP_visualize_overlap.R -p "$task_dir" \
     --existing_classes "$classes" --GP_package "$gp_package" \
     --score_threshold "$score_threshold" --n_vis "$n_vis_overlap" \
     --data_tr "$train_feat" \
     --out_path "$task_dir" \
-    "${extra_args[@]}"
+    ${extra_args[@]+"${extra_args[@]}"}
 done
 
 # ---- per-class trajectory: once per class across the WHOLE run, not per task ----
@@ -125,12 +143,39 @@ all_classes=$(ls "$run_root"/task*/GPparams_c*.rds 2>/dev/null \
 if [ -z "$all_classes" ]; then
   echo "No GPparams_c*.rds found under '$run_root' -- skipping GP_visualize_trajectory.R"
 else
-  for cls in $all_classes; do
-    echo "=== trajectory for class $cls (target_score_threshold: $target_score_threshold) ==="
-    Rscript GP_visualize_trajectory.R -r "$run_root" --class "$cls" \
+  run_trajectory() {
+    Rscript GP_visualize_trajectory.R -r "$run_root" --class "$1" \
+      --feature_size "$f_size" \
       --n_real "$n_real_traj" --n_test "$n_test_traj" \
       --target_score_threshold "$target_score_threshold" \
       --out_path "$run_root" \
-      "${extra_args[@]}"
+      ${extra_args[@]+"${extra_args[@]}"}
+  }
+
+  for cls in $all_classes; do
+    orig_file="$run_root/GP_original_reencoded_c${cls}.csv"
+    prev_file="$run_root/GP_prev_inducing_reencoded_c${cls}.csv"
+
+    need_reencode=0
+    if [ "${SKIP_REENCODE:-0}" != "1" ]; then
+      if [ "${FORCE_REENCODE:-0}" = "1" ] || [ ! -f "$orig_file" ] || [ ! -f "$prev_file" ]; then
+        need_reencode=1
+      fi
+    fi
+
+    if [ "$need_reencode" = "1" ]; then
+      # reencode reads task<t>/Zt_target_c<cls>.csv, written by the trajectory script
+      if ! ls "$run_root"/task*/Zt_target_c"${cls}".csv >/dev/null 2>&1; then
+        echo "=== trajectory for class $cls, pass 1 (exporting Zt_target_c${cls}.csv) ==="
+        run_trajectory "$cls"
+      fi
+      echo "=== reencode_true_across_tasks.py for class $cls ==="
+      "$python_bin" reencode_true_across_tasks.py --run_root "$run_root" \
+        --class "$cls" --f_size "$f_size" \
+        || echo "Warning: reencode_true_across_tasks.py failed for class $cls -- plotting without its layers" >&2
+    fi
+
+    echo "=== trajectory for class $cls (target_score_threshold: $target_score_threshold) ==="
+    run_trajectory "$cls"
   done
 fi

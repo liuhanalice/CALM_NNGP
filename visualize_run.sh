@@ -21,13 +21,21 @@
 # reencode -> trajectory again (final PDF). The reencode step needs the
 # python env with torch, <run_root>/checkpoints/model_task<t>.pt and MNIST
 # under ./data; if it fails, the trajectory plot is still made without those
-# two layers.
+# two layers. An existing GP_original_reencoded_c<class>.csv without the
+# head_score/head_pred columns (older reencode script) also triggers a rerun.
+#
+# After each class's trajectory, runs GP_score_orig_now.R (GP and Head scores
+# of the original images at every task) if GP_original_reencoded_c<class>.csv
+# exists, writing at the run root:
+#   <run_root>/GP_score_orig_now_c<class>.pdf
+#   <run_root>/GP_score_orig_now_c<class>_summary.csv, _scores.csv
 #
 # Usage:
 #   ./visualize_run.sh runs/run_20260824_122705 [extra Rscript args...]
 #
-# Any extra arguments are forwarded verbatim to all three Rscript calls, so
-# you can override anything, e.g.:
+# Any extra arguments are forwarded verbatim to the GP_visualize.R,
+# GP_visualize_overlap.R and GP_visualize_trajectory.R calls (not to
+# GP_score_orig_now.R), so you can override anything, e.g.:
 #   ./visualize_run.sh runs/run_20260824_122705 --n_real=500
 #
 # Env overrides:
@@ -36,7 +44,8 @@
   #   FORCE_REENCODE=1 SKIP_REENCODE=1 \
     # ./visualize_run.sh runs_mnist_continual/run_20260917_180345
 #   FORCE_REENCODE=1 reruns reencode_true_across_tasks.py even if its outputs
-#   exist; SKIP_REENCODE=1 never runs it.
+#   exist; SKIP_REENCODE=1 never runs it. SKIP_SCORE_ORIG=1 skips
+#   GP_score_orig_now.R.
 
 set -euo pipefail
 
@@ -160,6 +169,9 @@ else
     if [ "${SKIP_REENCODE:-0}" != "1" ]; then
       if [ "${FORCE_REENCODE:-0}" = "1" ] || [ ! -f "$orig_file" ] || [ ! -f "$prev_file" ]; then
         need_reencode=1
+      elif ! head -n 1 "$orig_file" | grep -q "head_score"; then
+        echo "$orig_file has no head_score column (older reencode script) -- regenerating"
+        need_reencode=1
       fi
     fi
 
@@ -177,5 +189,18 @@ else
 
     echo "=== trajectory for class $cls (target_score_threshold: $target_score_threshold) ==="
     run_trajectory "$cls"
+
+    if [ "${SKIP_SCORE_ORIG:-0}" != "1" ]; then
+      if [ -f "$orig_file" ]; then
+        echo "=== GP/Head scores of original images for class $cls ==="
+        Rscript GP_score_orig_now.R -r "$run_root" --class "$cls" \
+          --feature_size "$f_size" --GP_package "$gp_package" \
+          --score_threshold "$score_threshold" \
+          --out_path "$run_root" \
+          || echo "Warning: GP_score_orig_now.R failed for class $cls" >&2
+      else
+        echo "Skipping GP_score_orig_now.R for class $cls (no $orig_file)"
+      fi
+    fi
   done
 fi

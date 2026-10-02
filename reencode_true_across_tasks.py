@@ -28,6 +28,9 @@ encoder snapshot:
    nothing to do with replay, decode lossiness, or train/test being
    different image splits.
    Output: <run_root>/GP_original_reencoded_c<class>.csv
+   Also records that task's classification head output on the same images:
+   head_score = softmax probability of <class>, head_pred = argmax class
+   (extra columns after label; used by GP_score_orig_now.R).
 
 2. "prev_inducing_now" -- task (t-1)'s target-only inducing points
    (task<t-1>/Zt_target_c<class>.csv, exported by GP_visualize_trajectory.R
@@ -42,7 +45,8 @@ encoder snapshot:
 
 Both outputs share the same column layout: f0..f<feature_size-1>, task,
 label -- one row per (point, task) pair, `task` = which checkpoint did the
-re-encoding.
+re-encoding. GP_original_reencoded_c<class>.csv additionally has head_score,
+head_pred after label.
 
 Usage:
   python reencode_true_across_tasks.py --run_root runs_mnist_continual/run_20260924_004747 \
@@ -74,9 +78,9 @@ def load_model(ckpt_path, f_size, num_classes, device):
     return model
 
 
-def write_csv(rows, f_size, out_path):
+def write_csv(rows, f_size, out_path, extra_cols=()):
     f_cols = [f"f{i}" for i in range(f_size)]
-    header = f_cols + ["task", "label"]
+    header = f_cols + ["task", "label"] + list(extra_cols)
     with open(out_path, "w") as fh:
         fh.write(",".join(header) + "\n")
         for row in rows:
@@ -143,11 +147,17 @@ def main():
     orig_rows = []
     for t_num, model in models.items():
         with torch.no_grad():
-            feats = model.extract_adapter_features(real_imgs).cpu().numpy()
-        print(f"  orig_now task{t_num}: mean_var={feats.var(axis=0, ddof=1).mean():.4f}")
-        for row in feats:
-            orig_rows.append(list(row) + [t_num, args.cls])
-    write_csv(orig_rows, args.f_size, os.path.join(args.run_root, f"GP_original_reencoded_c{args.cls}.csv"))
+            feats_t = model.extract_adapter_features(real_imgs)
+            probs   = torch.softmax(model.forward_from_adapter(feats_t), dim=1).cpu().numpy()
+            feats   = feats_t.cpu().numpy()
+        head_score = probs[:, args.cls]
+        head_pred  = probs.argmax(axis=1)
+        print(f"  orig_now task{t_num}: mean_var={feats.var(axis=0, ddof=1).mean():.4f}, "
+              f"head p(class {args.cls}) mean={head_score.mean():.4f}, head acc={(head_pred == args.cls).mean():.4f}")
+        for row, hs, hp in zip(feats, head_score, head_pred):
+            orig_rows.append(list(row) + [t_num, args.cls, hs, int(hp)])
+    write_csv(orig_rows, args.f_size, os.path.join(args.run_root, f"GP_original_reencoded_c{args.cls}.csv"),
+              extra_cols=("head_score", "head_pred"))
 
     # =========================================================
     # 2) prev_inducing_now: task (t-1)'s target inducing points,

@@ -15,10 +15,18 @@
 # Optionally also scores task t's own training rows for the class
 # (task<t>/train_feat.csv, what the GP was actually fit on) as a reference.
 #
+# Also reports the classification HEAD's score on the same points: softmax
+# probability of <class> under task t's model. For orig_now this is the
+# head_score/head_pred columns reencode_true_across_tasks.py writes; for
+# train_now it is the z<class> column of train_feat.csv (also the GP's
+# regression target). Note train_feat.csv keeps only the top 95% most
+# confident rows per class (export_task_csvs keep_frac), so train_now's head
+# score is biased upward.
+#
 # Outputs (in --out_path, default --run_root):
 #   GP_score_orig_now_c<class>.pdf           histograms per task + summary over tasks
-#   GP_score_orig_now_c<class>_summary.csv   n, mean, sd, median, quantiles, pass rate per task/type
-#   GP_score_orig_now_c<class>_scores.csv    every scored point (task, type, score)
+#   GP_score_orig_now_c<class>_summary.csv   n, mean, sd, median, quantiles, pass rate, head acc per task/type/source
+#   GP_score_orig_now_c<class>_scores.csv    every scored point (task, type, source, id, score, correct)
 #
 # Requires reencode_true_across_tasks.py to have been run for this class.
 #
@@ -114,53 +122,79 @@ gp_score <- function(gp_model, X) {
   }
 }
 
+has_head <- all(c("head_score", "head_pred") %in% colnames(orig_df))
+if (!has_head) {
+  print(paste0("Note: ", orig_file, " has no head_score/head_pred columns (written by an older ",
+               "reencode_true_across_tasks.py) -- Head plots skipped. Regenerate it with: ",
+               "python reencode_true_across_tasks.py --run_root ", args$run_root, " --class ", cls, " --f_size ", f))
+}
+
 # ---- score every task ----
+# Long format: one row per (task, type, source, point); id pairs GP and Head
+# scores of the same point.
 score_rows <- list()
+add_scores <- function(t_num, type, source, score, correct = NA) {
+  score_rows[[length(score_rows) + 1]] <<- data.frame(
+    task = t_num, type = type, source = source, id = seq_along(score),
+    score = score, correct = correct)
+}
+
 for (i in which(has_gp)) {
   t_dir <- task_dirs[i]
   t_num <- task_nums[i]
 
-  X_orig <- as.matrix(orig_df[orig_df$task == t_num, 1:f, drop = FALSE])
-  if (nrow(X_orig) == 0) {
+  orig_t <- orig_df[orig_df$task == t_num, , drop = FALSE]
+  if (nrow(orig_t) == 0) {
     print(paste0("  task", t_num, ": no orig_now rows (no checkpoint for this task?) -- skipping"))
     next
   }
 
   gp_model <- load_gp(t_dir)
-  score_rows[[length(score_rows) + 1]] <- data.frame(
-    task = t_num, type = "orig_now", score = gp_score(gp_model, X_orig))
+  add_scores(t_num, "orig_now", "GP", gp_score(gp_model, as.matrix(orig_t[, 1:f])))
+  if (has_head) {
+    add_scores(t_num, "orig_now", "Head", orig_t$head_score, orig_t$head_pred == cls)
+  }
 
   if (isTRUE(args$include_train_now)) {
     train_file <- file.path(t_dir, "train_feat.csv")
     if (file.exists(train_file)) {
       tr <- read.csv(train_file)
-      tr <- tr[as.numeric(as.character(tr$label)) == cls, 1:f, drop = FALSE]
+      tr <- tr[as.numeric(as.character(tr$label)) == cls, , drop = FALSE]
       if (nrow(tr) > 0) {
         tr <- tr[sample(nrow(tr), min(as.integer(args$n_train_now), nrow(tr))), , drop = FALSE]
-        score_rows[[length(score_rows) + 1]] <- data.frame(
-          task = t_num, type = "train_now", score = gp_score(gp_model, as.matrix(tr)))
+        add_scores(t_num, "train_now", "GP", gp_score(gp_model, as.matrix(tr[, 1:f])))
+        # Head softmax columns z0..z<K-1> (export_task_csvs, CL_Driver.py)
+        z_cols <- grep("^z[0-9]+$", colnames(tr), value = TRUE)
+        if (paste0("z", cls) %in% z_cols) {
+          z <- as.matrix(tr[, z_cols])
+          pred <- as.integer(sub("^z", "", z_cols))[max.col(z, ties.method = "first")]
+          add_scores(t_num, "train_now", "Head", tr[[paste0("z", cls)]], pred == cls)
+        }
       }
     }
   }
 
   if (GP_package == "laGP") deleteGPsep(gp_model)
-  print(paste0("  task", t_num, ": scored ", nrow(X_orig), " orig_now points"))
+  print(paste0("  task", t_num, ": scored ", nrow(orig_t), " orig_now points"))
 }
 if (length(score_rows) == 0) stop("Nothing scored -- check that the orig_now CSV covers these tasks")
 
 scores_df <- do.call(rbind, score_rows)
-scores_df$type <- factor(scores_df$type, levels = c("orig_now", "train_now"))
+scores_df$type   <- factor(scores_df$type,   levels = c("orig_now", "train_now"))
+scores_df$source <- factor(scores_df$source, levels = c("GP", "Head"))
 
-# ---- summary stats per task/type ----
-summary_df <- do.call(rbind, lapply(split(scores_df, list(scores_df$task, scores_df$type), drop = TRUE), function(d) {
+# ---- summary stats per task/type/source ----
+groups <- split(scores_df, list(scores_df$task, scores_df$type, scores_df$source), drop = TRUE)
+summary_df <- do.call(rbind, lapply(groups, function(d) {
   s <- d$score
-  data.frame(task = d$task[1], type = d$type[1], n = length(s),
+  data.frame(task = d$task[1], type = d$type[1], source = d$source[1], n = length(s),
              mean = mean(s), sd = sd(s), median = median(s),
              q05 = unname(quantile(s, 0.05)), q95 = unname(quantile(s, 0.95)),
              min = min(s), max = max(s),
-             pass_rate = mean(s >= score_threshold))
+             pass_rate = mean(s >= score_threshold),          # would pass the replay filter (GP)
+             head_acc  = if (all(is.na(d$correct))) NA_real_ else mean(d$correct))  # argmax == class (Head)
 }))
-summary_df <- summary_df[order(summary_df$type, summary_df$task), ]
+summary_df <- summary_df[order(summary_df$source, summary_df$type, summary_df$task), ]
 rownames(summary_df) <- NULL
 print(summary_df)
 
@@ -169,65 +203,109 @@ write.csv(summary_df, file.path(out_path, paste0("GP_score_orig_now_c", cls, "_s
 
 # ---- plots ----
 type_colors <- c(orig_now = "purple", train_now = "darkorange")
-orig_sum    <- subset(summary_df, type == "orig_now")
-orig_sum$label <- sprintf("n = %d\nmean = %.3f\nsd = %.3f\nmedian = %.3f\n>= %.2f: %.1f%%",
-                          orig_sum$n, orig_sum$mean, orig_sum$sd, orig_sum$median,
-                          score_threshold, 100 * orig_sum$pass_rate)
+
+# Histogram of orig_now scores per task with mean / mean +/- sd and a stats box
+orig_hist_page <- function(src, fill, title, subtitle, extra_label) {
+  d   <- subset(scores_df, type == "orig_now" & source == src)
+  sm  <- subset(summary_df, type == "orig_now" & source == src)
+  sm$label <- paste0(sprintf("n = %d\nmean = %.3f\nsd = %.3f\nmedian = %.3f\n", sm$n, sm$mean, sm$sd, sm$median),
+                     extra_label(sm))
+  p <- ggplot(d, aes(x = score)) +
+    geom_histogram(bins = args$bins, fill = fill, alpha = 0.6, color = "white") +
+    geom_vline(data = sm, aes(xintercept = mean), color = "black", linewidth = 0.8) +
+    geom_vline(data = sm, aes(xintercept = mean - sd), color = "black", linetype = "dotted") +
+    geom_vline(data = sm, aes(xintercept = mean + sd), color = "black", linetype = "dotted") +
+    geom_label(data = sm, aes(x = -Inf, y = Inf, label = label),
+               hjust = -0.05, vjust = 1.1, size = 3, label.size = 0, alpha = 0.8) +
+    facet_wrap(~ task, labeller = label_both) +
+    labs(title = title, subtitle = subtitle, x = paste(src, "score"), y = "count") +
+    theme_minimal()
+  if (src == "GP") {
+    p <- p + geom_vline(xintercept = score_threshold, color = "red", linetype = "dashed", linewidth = 0.8)
+  }
+  p
+}
 
 pdf_path <- file.path(out_path, paste0("GP_score_orig_now_c", cls, ".pdf"))
 pdf(file = pdf_path, width = 10, height = 7)
 
-# Page 1: orig_now score histogram per task, with stats
-p1 <- ggplot(subset(scores_df, type == "orig_now"), aes(x = score)) +
-  geom_histogram(bins = args$bins, fill = "purple", alpha = 0.6, color = "white") +
-  geom_vline(data = orig_sum, aes(xintercept = mean), color = "black", linewidth = 0.8) +
-  geom_vline(data = orig_sum, aes(xintercept = mean - sd), color = "black", linetype = "dotted") +
-  geom_vline(data = orig_sum, aes(xintercept = mean + sd), color = "black", linetype = "dotted") +
-  geom_vline(xintercept = score_threshold, color = "red", linetype = "dashed", linewidth = 0.8) +
-  geom_label(data = orig_sum, aes(x = -Inf, y = Inf, label = label),
-             hjust = -0.05, vjust = 1.1, size = 3, label.size = 0, alpha = 0.8) +
-  facet_wrap(~ task, labeller = label_both) +
-  labs(title = paste0("Class ", cls, ": GP score of original real images (orig_now), per task"),
-       subtitle = paste0("Task t: original class-", cls, " images encoded with task t's encoder, scored by task t's class-",
-                         cls, " GP\nsolid = mean, dotted = mean +/- sd, red dashed = replay threshold (",
-                         score_threshold, ")"),
-       x = "GP score", y = "count") +
-  theme_minimal()
-print(p1)
+# Page 1: GP score of orig_now per task
+print(orig_hist_page(
+  "GP", "purple",
+  paste0("Class ", cls, ": GP score of original real images (orig_now), per task"),
+  paste0("Task t: original class-", cls, " images encoded with task t's encoder, scored by task t's class-",
+         cls, " GP\nsolid = mean, dotted = mean +/- sd, red dashed = replay threshold (", score_threshold, ")"),
+  function(sm) sprintf(">= %.2f: %.1f%%", score_threshold, 100 * sm$pass_rate)))
 
-# Page 2: orig_now vs. train_now (what the GP was fit on), per task
+# Page 2: Head score of orig_now per task
+if (has_head) {
+  print(orig_hist_page(
+    "Head", "seagreen",
+    paste0("Class ", cls, ": Head score of original real images (orig_now), per task"),
+    paste0("Task t: original class-", cls, " images through task t's model; Head score = softmax p(class ", cls,
+           ")\nsolid = mean, dotted = mean +/- sd; acc = % with argmax == ", cls),
+    function(sm) sprintf("acc = %.1f%%", 100 * sm$head_acc)))
+
+  # Page 3: GP vs. Head score of the same orig_now point
+  paired <- merge(subset(scores_df, type == "orig_now" & source == "GP",   c(task, id, score)),
+                  subset(scores_df, type == "orig_now" & source == "Head", c(task, id, score, correct)),
+                  by = c("task", "id"), suffixes = c("_gp", "_head"))
+  paired$head_pred <- factor(ifelse(paired$correct, paste0("argmax = ", cls), "argmax = other"),
+                             levels = c(paste0("argmax = ", cls), "argmax = other"))
+  p_pair <- ggplot(paired, aes(x = score_head, y = score_gp, color = head_pred)) +
+    geom_hline(yintercept = score_threshold, color = "red", linetype = "dashed") +
+    geom_point(size = 1.2, alpha = 0.5) +
+    facet_wrap(~ task, labeller = label_both) +
+    scale_color_manual(values = c("seagreen", "grey40"), name = "Head prediction") +
+    labs(title = paste0("Class ", cls, ": GP score vs. Head score of the same original image (orig_now)"),
+         subtitle = "each point = one original image; red dashed = replay threshold on the GP score",
+         x = paste0("Head softmax p(class ", cls, ")"), y = "GP score") +
+    theme_minimal()
+  print(p_pair)
+}
+
+# Page 4: orig_now vs. train_now (what the GP was fit on), per task, GP and Head
 if (any(scores_df$type == "train_now")) {
   p2 <- ggplot(scores_df, aes(x = score, fill = type)) +
     geom_histogram(bins = args$bins, alpha = 0.5, position = "identity", color = NA) +
-    geom_vline(xintercept = score_threshold, color = "red", linetype = "dashed", linewidth = 0.8) +
-    facet_wrap(~ task, labeller = label_both, scales = "free_y") +
+    geom_vline(data = data.frame(source = factor("GP", levels = levels(scores_df$source))),
+               aes(xintercept = score_threshold), color = "red", linetype = "dashed", linewidth = 0.8) +
+    facet_grid(source ~ task, labeller = label_both, scales = "free_y") +
     scale_fill_manual(values = type_colors) +
-    labs(title = paste0("Class ", cls, ": GP score of original images (orig_now) vs. task's own training data (train_now)"),
+    labs(title = paste0("Class ", cls, ": original images (orig_now) vs. task's own training data (train_now)"),
          subtitle = paste0("train_now = task t's train_feat.csv rows for class ", cls,
-                           " (real at introduction, decoded replay afterward); red dashed = replay threshold"),
-         x = "GP score", y = "count") +
+                           " (real at introduction, decoded replay afterward); red dashed = replay threshold (GP row)"),
+         x = "score", y = "count") +
     theme_minimal()
   print(p2)
 }
 
-# Page 3: mean +/- sd and pass rate over tasks
+# Page 5: mean +/- sd over tasks, GP and Head side by side
 p3 <- ggplot(summary_df, aes(x = task, y = mean, color = type)) +
-  geom_hline(yintercept = score_threshold, color = "red", linetype = "dashed") +
+  geom_hline(data = data.frame(source = factor("GP", levels = levels(summary_df$source))),
+             aes(yintercept = score_threshold), color = "red", linetype = "dashed") +
   geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd), width = 0.15) +
   geom_line(linewidth = 0.9) + geom_point(size = 2.5) +
+  facet_wrap(~ source, labeller = label_both) +
   scale_color_manual(values = type_colors) +
-  labs(title = paste0("Class ", cls, ": mean GP score over tasks (error bar = +/- sd)"),
-       subtitle = "red dashed = replay threshold", x = "task", y = "GP score") +
+  labs(title = paste0("Class ", cls, ": mean score over tasks (error bar = +/- sd)"),
+       subtitle = paste0("GP = class-", cls, " GP score (red dashed = replay threshold); Head = softmax p(class ", cls, ")"),
+       x = "task", y = "score") +
   theme_minimal()
 print(p3)
 
-p4 <- ggplot(summary_df, aes(x = task, y = 100 * pass_rate, color = type)) +
+# Page 6: GP pass rate and Head accuracy over tasks
+rate_df <- rbind(
+  transform(subset(summary_df, source == "GP"),   metric = paste0("GP score >= ", score_threshold), value = 100 * pass_rate),
+  transform(subset(summary_df, source == "Head"), metric = paste0("Head argmax = ", cls),           value = 100 * head_acc))
+p4 <- ggplot(rate_df, aes(x = task, y = value, color = type, linetype = metric)) +
   geom_line(linewidth = 0.9) + geom_point(size = 2.5) +
   scale_color_manual(values = type_colors) +
   coord_cartesian(ylim = c(0, 100)) +
-  labs(title = paste0("Class ", cls, ": % of points scoring >= replay threshold (", score_threshold, ")"),
-       subtitle = "i.e. how many would survive GP_sample.R's filter at that task",
-       x = "task", y = "% >= threshold") +
+  labs(title = paste0("Class ", cls, ": % passing the GP replay filter vs. % classified as ", cls, " by the Head"),
+       subtitle = paste0("GP line = how many would survive GP_sample.R's filter at that task; ",
+                         "Head line = head accuracy on these points"),
+       x = "task", y = "%") +
   theme_minimal()
 print(p4)
 
